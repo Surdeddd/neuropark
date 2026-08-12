@@ -7,9 +7,10 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
-from nn.catalog import load_catalog
+from nn.catalog import Catalog, load_catalog
 from nn.errors import Exit, NnError
 from nn.iotypes import check_extra, type_of
+from nn.quota import compute, exhausted_set
 from nn.registry import Registry, is_expired, load, save
 from nn.report import LS_HEADERS, STATS_HEADERS, WHY_HEADERS, ls_rows, stats_rows, table, why_rows
 from nn.resolve import resolve
@@ -43,6 +44,22 @@ def build_parser() -> argparse.ArgumentParser:
     run_cmd.add_argument("--extra", action="append", default=[])
     run_cmd.add_argument("--prompt")
     run_cmd.add_argument("--retries", type=int, default=1)
+    run_cmd.add_argument(
+        "--fallback",
+        action="store_true",
+        help="разрешить переход на следующего провайдера, если у лучшего исчерпано окно",
+    )
+
+    subs.add_parser("quota", help="окна квот: сожжено, что простаивает")
+
+    burn_cmd = subs.add_parser("burn", help="прожечь простаивающую квоту")
+    burn_subs = burn_cmd.add_subparsers(dest="burn_command")
+    burn_add = burn_subs.add_parser("add", help="положить задачу в очередь")
+    burn_add.add_argument("capability")
+    burn_add.add_argument("input")
+    burn_add.add_argument("--note", default="")
+    burn_run = burn_subs.add_parser("run", help="показать или выполнить подходящие задачи")
+    burn_run.add_argument("--yes", action="store_true", help="действительно запускать")
 
     recipe_cmd = subs.add_parser("recipe", help="готовые цепочки")
     recipe_subs = recipe_cmd.add_subparsers(dest="recipe_command")
@@ -54,6 +71,16 @@ def build_parser() -> argparse.ArgumentParser:
     subs.add_parser("doctor", help="проверить целостность каталога")
     subs.add_parser("stats", help="сколько раз что вызывалось")
     return parser
+
+
+def _exhausted(catalog: Catalog) -> frozenset[str]:
+    """Провайдеры с исчерпанным окном, посчитанные из runs.jsonl.
+
+    Само решение, что с ними делать, принимает резолвер: без --fallback он
+    отказывается и называет альтернативу, с флагом — переключается явно.
+    """
+    now = datetime.now(UTC)
+    return exhausted_set(compute(catalog.providers, read_all(), now=now), now=now)
 
 
 def _load_registry() -> Registry:
@@ -154,6 +181,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
         registry=registry,
         in_type=in_type,
         pin=args.provider,
+        exhausted=_exhausted(catalog),
+        allow_fallback=args.fallback,
         last_success=last_success_map(),
     )
     envelope = execute(
@@ -169,6 +198,97 @@ def _cmd_run(args: argparse.Namespace) -> int:
     if envelope.status == "manual":
         print(f"\nвыполни вручную:\n{envelope.command}", file=sys.stderr)
     return int(exit_code_for(envelope))
+
+
+def _cmd_quota(as_json: bool) -> int:
+    catalog = load_catalog()
+    now = datetime.now(UTC)
+    windows = compute(catalog.providers, read_all(), now=now)
+    if as_json:
+        payload = {
+            pid: {
+                "window_h": w.window_h,
+                "calls": w.calls,
+                "soft_cap": w.soft_cap,
+                "remaining": w.remaining,
+                "resets_at": w.resets_at.isoformat() if w.resets_at else None,
+                "exhausted": w.is_exhausted(now=now),
+            }
+            for pid, w in windows.items()
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return int(Exit.OK)
+    rows = [
+        [
+            pid,
+            f"{w.window_h:g}ч",
+            f"{w.calls}/{w.soft_cap}" if w.soft_cap else str(w.calls),
+            "исчерпано" if w.is_exhausted(now=now) else ("простаивает" if w.idle else "живое"),
+            w.resets_at.strftime("%H:%M") if w.resets_at else "-",
+        ]
+        for pid, w in sorted(windows.items())
+    ]
+    print(table(rows, ["провайдер", "окно", "сожжено", "состояние", "закроется"]))
+    if not windows:
+        print("\nни один манифест не объявил window_h — учитывать нечего")
+    return int(Exit.OK)
+
+
+def _cmd_burn(args: argparse.Namespace) -> int:
+    from nn.burn import BurnTask, candidates, enqueue, read_queue, rewrite_queue
+    from nn.recipe import run_recipe  # noqa: F401 — держим импорт рядом с исполнением
+
+    catalog = load_catalog()
+    now = datetime.now(UTC)
+
+    if args.burn_command == "add":
+        enqueue(
+            BurnTask(
+                ts=now.isoformat(),
+                capability=args.capability,
+                input=str(Path(args.input).expanduser()),
+                note=args.note,
+            )
+        )
+        print(f"в очередь: {args.capability} ← {args.input}")
+        return int(Exit.OK)
+
+    windows = compute(catalog.providers, read_all(), now=now)
+    tasks = read_queue()
+    provider_capability = {pid: p.capability for pid, p in catalog.providers.items()}
+    pairs = candidates(windows, tasks, provider_capability, now=now)
+
+    if not pairs:
+        print("прожигать нечего: либо нет простаивающих окон, либо очередь пуста")
+        return int(Exit.OK)
+
+    rows = [
+        [w.provider, t.capability, t.input, w.resets_at.strftime("%H:%M") if w.resets_at else "-"]
+        for w, t in pairs
+    ]
+    print(table(rows, ["окно", "capability", "вход", "закроется"]))
+
+    if not args.yes:
+        print("\nэто предложение. запуск — с --yes")
+        return int(Exit.OK)
+
+    registry = _load_registry()
+    done: list[str] = []
+    for window, item in pairs:
+        choice = resolve(
+            item.capability,
+            catalog=catalog,
+            registry=registry,
+            in_type=type_of(item.input, catalog.types),
+            pin=window.provider,
+            last_success=last_success_map(),
+        )
+        envelope = execute(choice, catalog=catalog, in_path=item.input)
+        print(envelope.to_json())
+        if envelope.outcome == "success":
+            done.append(item.input)
+    rewrite_queue([t for t in tasks if t.input not in done])
+    return int(Exit.OK)
 
 
 def _cmd_recipe(args: argparse.Namespace) -> int:
@@ -248,6 +368,10 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_why(args.capability, args.in_type, args.json)
         if args.command == "run":
             return _cmd_run(args)
+        if args.command == "quota":
+            return _cmd_quota(args.json)
+        if args.command == "burn":
+            return _cmd_burn(args)
         if args.command == "recipe":
             return _cmd_recipe(args)
         if args.command == "doctor":

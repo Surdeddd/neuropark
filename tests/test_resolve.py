@@ -132,7 +132,7 @@ def test_out_type_resolves_same():
     assert choice.out_type == "srt"
 
 
-def test_all_exhausted_gives_quota_code():
+def test_single_exhausted_provider_gives_quota_code():
     catalog, registry = build([prov("a")])
     with pytest.raises(NnError) as err:
         resolve(
@@ -144,10 +144,27 @@ def test_all_exhausted_gives_quota_code():
         )
     assert err.value.code == Exit.QUOTA
     assert "a" in err.value.message
+    assert "замены нет" in err.value.message
 
 
-def test_exhausted_does_not_silently_switch_provider():
-    """Ключевое правило: подмены на живого соседа быть не должно без явного согласия."""
+def test_exhausted_leader_refuses_instead_of_switching():
+    """Ключевое правило спеки: молча подменять модель нельзя даже когда есть живой запас."""
+    catalog, registry = build([prov("primary", rank=9), prov("spare", rank=1)])
+    with pytest.raises(NnError) as err:
+        resolve(
+            "transcribe",
+            catalog=catalog,
+            registry=registry,
+            in_type="audio",
+            exhausted=frozenset({"primary"}),
+        )
+    assert err.value.code == Exit.QUOTA
+    assert "primary" in err.value.message
+    assert "spare" in err.value.message  # альтернативу обязаны назвать
+    assert "--fallback" in err.value.message
+
+
+def test_fallback_flag_allows_explicit_switch():
     catalog, registry = build([prov("primary", rank=9), prov("spare", rank=1)])
     choice = resolve(
         "transcribe",
@@ -155,10 +172,36 @@ def test_exhausted_does_not_silently_switch_provider():
         registry=registry,
         in_type="audio",
         exhausted=frozenset({"primary"}),
+        allow_fallback=True,
     )
-    # запас взят только потому, что primary отфильтрован ДО выбора и это видно в rejected
     assert choice.provider.id == "spare"
     assert any("квоты" in r.reason for r in choice.rejected)
+
+
+def test_exhausted_non_leader_does_not_block_anything():
+    catalog, registry = build([prov("primary", rank=9), prov("spare", rank=1)])
+    choice = resolve(
+        "transcribe",
+        catalog=catalog,
+        registry=registry,
+        in_type="audio",
+        exhausted=frozenset({"spare"}),
+    )
+    assert choice.provider.id == "primary"
+
+
+def test_fallback_with_everything_exhausted_is_quota():
+    catalog, registry = build([prov("a"), prov("b")])
+    with pytest.raises(NnError) as err:
+        resolve(
+            "transcribe",
+            catalog=catalog,
+            registry=registry,
+            in_type="audio",
+            exhausted=frozenset({"a", "b"}),
+            allow_fallback=True,
+        )
+    assert err.value.code == Exit.QUOTA
 
 
 def test_unknown_capability_fails():

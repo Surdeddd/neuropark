@@ -10,6 +10,7 @@
   "io": { "in": ["text"], "out": "image" },
   "run": "python3 ~/scripts/gen-image.py generate --provider chatgpt --prompt \"$(cat {in})\" --out {out}",
   "timeout_s": 600,
+  "window_h": 5,
   "quota_patterns": ["usage limit", "rate limit", "quota"],
-  "notes": "gpt-image-2 через Codex OAuth, без API-ключа. primary для любых картинок"
+  "notes": "gpt-image-2 через Codex OAuth, без API-ключа. primary для любых картинок. window_h=5 — окно подписки ChatGPT; soft_cap не задан: лимит картинок неизвестен, исчерпание ловится по stderr"
 }

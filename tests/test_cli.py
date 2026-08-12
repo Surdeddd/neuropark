@@ -137,6 +137,75 @@ def test_stats_without_runs_says_empty(env, capsys):
     assert "пусто" in capsys.readouterr().out.lower()
 
 
+def test_quota_says_nothing_tracked_when_no_windows(env, capsys):
+    main(["scan"])
+    capsys.readouterr()
+    assert main(["quota"]) == int(Exit.OK)
+    assert "window_h" in capsys.readouterr().out
+
+
+def test_quota_shows_window_after_a_run(env, capsys, monkeypatch, tmp_path):
+    """Провайдер с окном: после запуска видно сожжённый вызов."""
+    data = tmp_path / "data"
+    payload = dict(PROVIDER, window_h=5, soft_cap_calls=3)
+    (data / "providers" / "fake-srt.json").write_text(json.dumps(payload), encoding="utf-8")
+    main(["scan"])
+    source = env / "a.wav"
+    source.write_bytes(b"\x00")
+    main(["run", "transcribe", str(source)])
+    capsys.readouterr()
+    assert main(["quota"]) == int(Exit.OK)
+    out = capsys.readouterr().out
+    assert "fake-srt" in out
+    assert "1/3" in out
+
+
+def test_run_refuses_when_leader_window_exhausted(env, capsys, tmp_path):
+    data = tmp_path / "data"
+    payload = dict(PROVIDER, window_h=5, soft_cap_calls=1)
+    (data / "providers" / "fake-srt.json").write_text(json.dumps(payload), encoding="utf-8")
+    main(["scan"])
+    source = env / "a.wav"
+    source.write_bytes(b"\x00")
+    assert main(["run", "transcribe", str(source)]) == int(Exit.OK)
+    capsys.readouterr()
+    # второй вызов упирается в soft_cap: обязан отказать кодом 6, а не подменить модель
+    assert main(["run", "transcribe", str(source)]) == int(Exit.QUOTA)
+    assert "окно квоты" in capsys.readouterr().err
+
+
+def test_burn_add_then_list(env, capsys, tmp_path):
+    data = tmp_path / "data"
+    payload = dict(PROVIDER, window_h=5, soft_cap_calls=5)
+    (data / "providers" / "fake-srt.json").write_text(json.dumps(payload), encoding="utf-8")
+    main(["scan"])
+    source = env / "a.wav"
+    source.write_bytes(b"\x00")
+    capsys.readouterr()
+    assert main(["burn", "add", "transcribe", str(source)]) == int(Exit.OK)
+    assert "в очередь" in capsys.readouterr().out
+    assert main(["burn", "run"]) == int(Exit.OK)
+    out = capsys.readouterr().out
+    assert "fake-srt" in out
+    assert "--yes" in out  # без флага только предложение
+
+
+def test_burn_run_with_yes_executes_and_clears_queue(env, capsys, tmp_path):
+    data = tmp_path / "data"
+    payload = dict(PROVIDER, window_h=5, soft_cap_calls=5)
+    (data / "providers" / "fake-srt.json").write_text(json.dumps(payload), encoding="utf-8")
+    main(["scan"])
+    source = env / "a.wav"
+    source.write_bytes(b"\x00")
+    main(["burn", "add", "transcribe", str(source)])
+    capsys.readouterr()
+    assert main(["burn", "run", "--yes"]) == int(Exit.OK)
+    assert "success" in capsys.readouterr().out
+    capsys.readouterr()
+    main(["burn", "run"])
+    assert "прожигать нечего" in capsys.readouterr().out
+
+
 def test_no_command_prints_help(env, capsys):
     assert main([]) == int(Exit.OK)
     assert "каталог парка нейронок" in capsys.readouterr().out

@@ -62,6 +62,7 @@ def resolve(
     pin: str | None = None,
     system: str | None = None,
     exhausted: frozenset[str] = frozenset(),
+    allow_fallback: bool = False,
     last_success: Mapping[str, str] | None = None,
     runner: Runner = shell_runner,
 ) -> Choice:
@@ -96,10 +97,6 @@ def resolve(
         if not provider.adapter and pick(provider.run, system=system) is None:
             rejected.append(Rejection(provider.id, "нет шаблона run под текущую ОС"))
             continue
-        if provider.id in exhausted:
-            quota_blocked.append(provider.id)
-            rejected.append(Rejection(provider.id, "окно квоты исчерпано"))
-            continue
         bridge: Bridge | None = None
         if in_type is not None and not accepts(provider.io_in, in_type):
             bridge = find_bridge(in_type, provider.io_in, catalog.bridges, runner=runner)
@@ -115,18 +112,43 @@ def resolve(
 
     if not candidates:
         summary = "; ".join(f"{r.provider}: {r.reason}" for r in rejected) or "кандидатов нет"
-        if quota_blocked and len(quota_blocked) == len(rejected):
-            raise NnError(
-                Exit.QUOTA,
-                f"все провайдеры {capability} исчерпали окно квоты: {', '.join(quota_blocked)}",
-            )
         if rejected and all("мостика нет" in r.reason for r in rejected):
             raise NnError(
                 Exit.BAD_IO, f"{capability}: вход {in_type} никем не принимается — {summary}"
             )
         raise NnError(Exit.NO_PROVIDER, f"нет доступного провайдера для {capability} — {summary}")
 
-    provider, host, bridge = min(candidates, key=lambda item: _sort_key(item[0], item[1], recent))
+    ranked = sorted(candidates, key=lambda item: _sort_key(item[0], item[1], recent))
+
+    # Квота проверяется ПОСЛЕ ранжирования и намеренно не фильтрует кандидатов заранее:
+    # если победитель исчерпал окно, мы обязаны отказаться и назвать альтернативу,
+    # а не тихо подсунуть другую модель. Переключение — только по явному allow_fallback.
+    if exhausted:
+        if allow_fallback:
+            fresh = [item for item in ranked if item[0].id not in exhausted]
+            for item in ranked:
+                if item[0].id in exhausted:
+                    quota_blocked.append(item[0].id)
+                    rejected.append(Rejection(item[0].id, "окно квоты исчерпано, взят следующий"))
+            if not fresh:
+                raise NnError(
+                    Exit.QUOTA,
+                    f"все провайдеры {capability} исчерпали окно: {', '.join(quota_blocked)}",
+                )
+            ranked = fresh
+        elif ranked[0][0].id in exhausted:
+            spare = [item[0].id for item in ranked[1:] if item[0].id not in exhausted]
+            hint = (
+                f"живая альтернатива: {spare[0]}, повтори с --fallback"
+                if spare
+                else "замены нет"
+            )
+            raise NnError(
+                Exit.QUOTA,
+                f"{ranked[0][0].id} исчерпал окно квоты для {capability}. {hint}",
+            )
+
+    provider, host, bridge = ranked[0]
     cap = catalog.capabilities.get(capability)
     if cap is None:
         out_type = provider.io_out
