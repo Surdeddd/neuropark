@@ -305,7 +305,7 @@ disappeared:
 
 ```bash
 make help         # every target
-make check        # ruff + ruff format + mypy --strict + 347 unit tests, no network, ~10s
+make check        # ruff + ruff format + mypy --strict + 353 unit tests, no network, ~10s
 make smoke-fast   # live offline runs: scan, transcript, bridge, doctor (~30s)
 make smoke        # plus TTS with a cold model start (up to 15 min)
 make hooks        # git pre-commit hook: the same checks before anything enters history

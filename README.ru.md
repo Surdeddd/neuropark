@@ -306,7 +306,7 @@ nn learn          # сжать неудачи в досье провайдеро
 
 ```bash
 make help         # все цели
-make check        # ruff + ruff format + mypy --strict + 347 юнитов, без сети, ~10с
+make check        # ruff + ruff format + mypy --strict + 353 юнитов, без сети, ~10с
 make smoke-fast   # живые прогоны офлайн: скан, транскрипт, мостик, доктор (~30с)
 make smoke        # плюс TTS с холодным старом модели (до 15 минут)
 make hooks        # гит-хук pre-commit: те же проверки до того, как что-то попадёт в историю

@@ -1,11 +1,15 @@
 """Упаковка плагина: манифесты валидны, скилл на месте, install.sh корректен."""
 
 import json
+import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
+
+from nn.errors import Exit
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -274,3 +278,76 @@ def test_installer_offers_the_hook_without_forcing_it():
     text = (ROOT / "install.sh").read_text(encoding="utf-8")
     assert "pre-commit" in text
     assert "NN_INSTALL_HOOKS" in text  # неинтерактивный путь тоже назван
+
+
+def test_launcher_refuses_old_python_with_a_clear_message(tmp_path):
+    """На macOS первым в PATH часто стоит системный 3.9 — раньше это давало ImportError."""
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    stub = fake / "python3"
+    # Заглушка ведёт себя как python 3.9: проверку версии не проходит,
+    # а --version печатает старый номер, который nn обязан назвать в сообщении.
+    stub.write_text(
+        '#!/bin/sh\ncase "$1" in -c) exit 1 ;; esac\necho 3.9.6\n',
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    result = subprocess.run(
+        [str(ROOT / "bin" / "nn"), "--version"],
+        capture_output=True,
+        text=True,
+        check=False,
+        # /usr/bin и /bin оставлены только ради bash: настоящего python 3.11+ там нет.
+        env={"PATH": f"{fake}:/usr/bin:/bin", "NN_LANG": "en", "NN_PYTHON": str(stub)},
+    )
+    assert result.returncode == int(Exit.BAD_DATA), result
+    assert "3.11+" in result.stderr
+    assert "NN_PYTHON" in result.stderr
+
+
+def test_launcher_is_not_fooled_by_a_command_that_always_succeeds():
+    """Проверка смотрит на ответ, а не на код возврата: /bin/echo выходит нулём на всё."""
+    result = subprocess.run(
+        [str(ROOT / "bin" / "nn"), "--version"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={"PATH": "/usr/bin:/bin", "NN_LANG": "en", "NN_PYTHON": "/bin/echo"},
+    )
+    assert result.returncode == int(Exit.BAD_DATA), result
+    assert "3.11+" in result.stderr
+
+
+def test_launcher_names_a_missing_interpreter():
+    result = subprocess.run(
+        [str(ROOT / "bin" / "nn"), "--version"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={"PATH": "/usr/bin:/bin", "NN_LANG": "en", "NN_PYTHON": "/nope/python"},
+    )
+    assert result.returncode == int(Exit.BAD_DATA), result
+    assert "no such interpreter" in result.stderr
+
+
+def test_launcher_prefers_a_working_interpreter(tmp_path):
+    """Битый python3 в PATH не должен ломать nn, если рядом есть годный."""
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    stub = fake / "python3"
+    stub.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    stub.chmod(0o755)
+    good = shutil.which("python3.13") or shutil.which("python3.12") or shutil.which("python3.11")
+    if good is None:
+        pytest.skip("на этой машине нет отдельного python3.11+ рядом с системным")
+    env = dict(os.environ)
+    env["PATH"] = f"{fake}:{Path(good).parent}:/usr/bin:/bin"
+    result = subprocess.run(
+        [str(ROOT / "bin" / "nn"), "--version"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith("nn ")

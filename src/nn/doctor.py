@@ -218,13 +218,17 @@ def check(
         by_capability.setdefault(provider.capability, []).append(provider.id)
     for capability, ids in sorted(by_capability.items()):
         if not any(registry.ok(pid) for pid in ids):
+            # Предупреждение, а не ошибка: на машине, где инструмент просто не поставлен,
+            # каталог цел. Раньше это был error, и doctor на свежей машине отдавал 7 —
+            # выглядело как «nn сломан», хотя парк всего лишь пуст.
             findings.append(
                 Finding(
-                    "error",
+                    "warn",
                     capability,
                     bi(
-                        f"capability {capability}: no available provider",
-                        f"capability {capability}: ни одного доступного провайдера",
+                        f"capability {capability}: no provider available — is the tool installed?",
+                        f"capability {capability}: ни одного доступного провайдера —"
+                        " инструмент вообще установлен?",
                     ),
                 )
             )

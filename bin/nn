@@ -1,4 +1,54 @@
 #!/usr/bin/env bash
+# Обёртка над nn.cli. Ищет python 3.11+, а не берёт первый в PATH: на macOS
+# первым часто оказывается системный 3.9, и тогда вместо внятного сообщения
+# пользователь получал ImportError про datetime.UTC.
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m nn.cli "$@"
+
+# Сверяем ответ, а не код возврата: /bin/echo и прочее «всё хорошо» выходят нулём
+# на любой аргумент и притворились бы годным интерпретатором.
+usable() {
+  [ "$("$1" -c 'import sys; print("nn-ok" if sys.version_info >= (3, 11) else "nn-old")' 2>/dev/null)" = nn-ok ]
+}
+
+refuse() {
+  found="$("$1" --version 2>/dev/null | awk '{print $NF}' || true)"
+  case "${found}" in
+    [0-9]*.[0-9]*) ;;
+    *) found="" ;;
+  esac
+  case "${NN_LANG:-${LC_ALL:-${LANG:-en}}}" in
+    ru*)
+      printf 'nn: нужен python 3.11+, найден %s. Поставь новее или задай NN_PYTHON=/путь/к/python3\n' "${found:-none}" >&2
+      ;;
+    *)
+      printf 'nn: python 3.11+ required, found %s. Install a newer one or set NN_PYTHON=/path/to/python3\n' "${found:-none}" >&2
+      ;;
+  esac
+  exit 7
+}
+
+# NN_PYTHON — указание, а не подсказка: если названный интерпретатор не годится,
+# nn отказывается, а не берёт молча другой. То же правило, что и для провайдеров.
+if [ -n "${NN_PYTHON:-}" ]; then
+  if ! command -v "$NN_PYTHON" >/dev/null 2>&1; then
+    case "${NN_LANG:-${LC_ALL:-${LANG:-en}}}" in
+      ru*) printf 'nn: NN_PYTHON=%s — такого интерпретатора нет\n' "$NN_PYTHON" >&2 ;;
+      *) printf 'nn: NN_PYTHON=%s — no such interpreter\n' "$NN_PYTHON" >&2 ;;
+    esac
+    exit 7
+  fi
+  usable "$NN_PYTHON" || refuse "$NN_PYTHON"
+  interpreter="$NN_PYTHON"
+else
+  interpreter=""
+  for candidate in python3 python3.13 python3.12 python3.11 python; do
+    if command -v "$candidate" >/dev/null 2>&1 && usable "$candidate"; then
+      interpreter="$candidate"
+      break
+    fi
+  done
+  [ -n "$interpreter" ] || refuse python3
+fi
+
+PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}" exec "$interpreter" -m nn.cli "$@"

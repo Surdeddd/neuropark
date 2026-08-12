@@ -1,8 +1,12 @@
-from nn.catalog import Catalog
+from pathlib import Path
+
+from nn.catalog import Catalog, load_catalog
 from nn.doctor import check
 from nn.model import Bridge, Capability, Host, Provider
 from nn.registry import Entry, Registry
 from nn.runlog import RunRecord
+
+ROOT = Path(__file__).resolve().parents[1]
 
 LOCAL = Host(id="local", kind="local")
 
@@ -141,3 +145,18 @@ def test_missing_registry_is_single_error():
     assert len(findings) == 1
     assert findings[0].severity == "error"
     assert "nn scan" in findings[0].message
+
+
+def test_empty_park_is_a_warning_not_an_error(tmp_path, monkeypatch):
+    """На машине без инструментов каталог цел: doctor обязан дать warn и exit 0.
+
+    Пойман CI: на пустом раннере doctor отдавал 7, и это читалось как «nn сломан».
+    """
+    monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
+    catalog = load_catalog(ROOT)
+    empty = Registry(hostname="bare", generated_at="2026-08-12T00:00:00+00:00", entries={})
+    findings = check(catalog, empty, runs=[])
+    assert findings, "пустой парк должен быть замечен"
+    absent = [f for f in findings if "provider available" in f.message or "доступного" in f.message]
+    assert absent
+    assert all(f.severity == "warn" for f in absent), [f for f in absent if f.severity != "warn"]

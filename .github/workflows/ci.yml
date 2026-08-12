@@ -48,8 +48,8 @@ jobs:
         run: pytest -m "not smoke" -q
 
       # The bundled catalog must load and the CLI must answer on a clean machine,
-      # where almost no AI tool is installed. Exit code 5 (registry missing) is the
-      # only acceptable failure before a scan, and doctor may warn but must not error.
+      # where no AI tool is installed at all. An empty park is not a defect: doctor
+      # warns and still exits 0 — the first run of this step proved otherwise.
       - name: Cold start on a bare machine
         run: |
           set -euo pipefail
@@ -77,4 +77,12 @@ jobs:
           NN_LANG=ru ./bin/nn ls | head -2
 
       - name: Installer is shell-clean
-        run: bash -n install.sh hooks/session-start.sh hooks/pre-commit
+        run: bash -n install.sh hooks/session-start.sh hooks/pre-commit bin/nn
+
+      # A named interpreter that cannot run nn must be refused by name, never
+      # silently swapped for another one — the same rule providers live by.
+      - name: The launcher refuses an unusable interpreter
+        run: |
+          set -uo pipefail
+          NN_PYTHON=/bin/echo ./bin/nn --version
+          test $? -eq 7 || (echo "expected exit 7" && exit 1)

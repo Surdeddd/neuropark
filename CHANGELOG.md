@@ -42,6 +42,19 @@ Setup, presentation, and the localization the previous release only claimed.
 - **`nn ls <unknown>`, `nn doctor` and `nn stats` printed nothing at all** when there was
   nothing in the table. Silence is indistinguishable from a broken command; each now says
   what it found, and `ls` names the capabilities it does know.
+- **`nn doctor` called a bare machine broken.** With no tool installed, every capability
+  produced a `error … no available provider` and doctor exited 7 — so the first thing a new
+  user saw after `install.sh` looked like nn itself was broken. An unavailable provider is
+  now a warning with a question ("is the tool installed?"), and the exit code stays 0. Real
+  catalog defects — a bad template, a moved model path, a role pointing at nothing — are
+  still errors. Caught by the CI step written in this same release.
+- **The launcher died with a raw `ImportError` on old python.** `bin/nn` ran whatever
+  `python3` came first, and on macOS that is often the system 3.9, which fails on
+  `datetime.UTC`. It now looks for a 3.11+ interpreter and, failing that, says so in one
+  line and exits 7. `NN_PYTHON` overrides the search and is authoritative: a named
+  interpreter that cannot run nn is refused by name, never silently swapped — the same rule
+  providers live by. The check compares the interpreter's answer, not its exit status, so
+  `/bin/echo` can no longer pose as python.
 - **Git's own environment could hijack a worktree run.** Inside any git hook, git exports
   `GIT_DIR`, `GIT_INDEX_FILE` and relatives; a child process with `cwd` set to a different
   repository still obeys those variables. So `nn orchestrate` called from a hook would have
