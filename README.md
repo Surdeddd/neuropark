@@ -6,7 +6,7 @@
 
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![deps](https://img.shields.io/badge/runtime%20deps-zero-brightgreen)](#why-it-stays-alive)
-[![tests](https://img.shields.io/badge/tests-313-brightgreen)](#development)
+[![tests](https://img.shields.io/badge/tests-326-brightgreen)](#development)
 [![typed](https://img.shields.io/badge/mypy-strict-blue)](#development)
 [![license](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 [![lang](https://img.shields.io/badge/UI-EN%20%2F%20RU-orange)](#language)
@@ -267,7 +267,7 @@ disappeared:
 ## Development
 
 ```bash
-make check        # ruff + mypy --strict + 313 unit tests, no network, ~10s
+make check        # ruff + mypy --strict + 326 unit tests, no network, ~10s
 make smoke-fast   # live offline runs: scan, transcript, bridge, doctor (~30s)
 make smoke        # plus TTS with a cold model start (up to 15 min)
 ```

@@ -6,7 +6,7 @@
 
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![deps](https://img.shields.io/badge/зависимостей%20в%20рантайме-ноль-brightgreen)](#почему-это-не-умрёт)
-[![tests](https://img.shields.io/badge/тестов-313-brightgreen)](#разработка)
+[![tests](https://img.shields.io/badge/тестов-326-brightgreen)](#разработка)
 [![typed](https://img.shields.io/badge/mypy-strict-blue)](#разработка)
 [![license](https://img.shields.io/badge/лицензия-MIT-lightgrey)](LICENSE)
 [![lang](https://img.shields.io/badge/интерфейс-EN%20%2F%20RU-orange)](#язык)
@@ -267,7 +267,7 @@ nn learn          # сжать неудачи в досье провайдеро
 ## Разработка
 
 ```bash
-make check        # ruff + mypy --strict + 313 юнитов, без сети, ~10с
+make check        # ruff + mypy --strict + 326 юнитов, без сети, ~10с
 make smoke-fast   # живые прогоны офлайн: скан, транскрипт, мостик, доктор (~30с)
 make smoke        # плюс TTS с холодным старом модели (до 15 минут)
 ```
