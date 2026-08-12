@@ -81,8 +81,11 @@ jobs:
 
       # A named interpreter that cannot run nn must be refused by name, never
       # silently swapped for another one — the same rule providers live by.
+      # The step's shell is bash -e, so the refusal has to be caught with || —
+      # otherwise the expected non-zero exit kills the step before it is checked.
       - name: The launcher refuses an unusable interpreter
         run: |
           set -uo pipefail
-          NN_PYTHON=/bin/echo ./bin/nn --version
-          test $? -eq 7 || (echo "expected exit 7" && exit 1)
+          code=0
+          NN_PYTHON=/bin/echo ./bin/nn --version || code=$?
+          test "$code" -eq 7 || { echo "expected exit 7, got $code"; exit 1; }
