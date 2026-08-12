@@ -9,7 +9,7 @@ from typing import Any, Protocol, TypeVar
 from nn.errors import Exit, NnError
 from nn.i18n import bi
 from nn.model import Bridge, Capability, Host, Provider, Recipe, RolesConfig
-from nn.paths import data_dir, state_dir
+from nn.paths import data_dir, state_dir, user_data_dir
 from nn.schema import (
     parse_bridge,
     parse_capabilities,
@@ -77,13 +77,37 @@ def _load_dir(root: Path, sub: str, parse: Callable[..., T]) -> dict[str, T]:
     return out
 
 
-def load_catalog(root: Path | None = None) -> Catalog:
+V = TypeVar("V")
+
+
+def _merge(bundled: dict[str, V], personal: dict[str, V]) -> dict[str, V]:
+    """Личное перекрывает поставляемое при совпадении ключа."""
+    merged = dict(bundled)
+    merged.update(personal)
+    return merged
+
+
+def _layer(bundled_root: Path, user_root: Path | None, sub: str, parse: Any) -> dict[str, Any]:
+    bundled = _load_dir(bundled_root, sub, parse)
+    if user_root is None or user_root == bundled_root:
+        return bundled
+    return _merge(bundled, _load_dir(user_root, sub, parse))
+
+
+def load_catalog(root: Path | None = None, *, user_root: Path | None = None) -> Catalog:
     base = root or data_dir()
+    personal = user_root if user_root is not None else (None if root else user_data_dir())
+
     caps_path = base / "capabilities.json"
     if not caps_path.is_file():
         raise NnError(Exit.BAD_DATA, bi(f"{caps_path} is missing", f"{caps_path} отсутствует"))
     caps, types = parse_capabilities(_read(caps_path))
-    hosts = _load_dir(base, "hosts", parse_host)
+    if personal is not None and (personal / "capabilities.json").is_file():
+        extra_caps, extra_types = parse_capabilities(_read(personal / "capabilities.json"))
+        caps = _merge(caps, extra_caps)
+        types = _merge(types, extra_types)
+
+    hosts = _layer(base, personal, "hosts", parse_host)
     if "local" not in hosts:
         raise NnError(
             Exit.BAD_DATA,
@@ -93,12 +117,12 @@ def load_catalog(root: Path | None = None) -> Catalog:
             ),
         )
     return Catalog(
-        providers=_load_dir(base, "providers", parse_provider),
+        providers=_layer(base, personal, "providers", parse_provider),
         hosts=hosts,
         capabilities=caps,
         types=types,
-        bridges=_load_dir(base, "bridges", parse_bridge),
-        recipes=_load_dir(base, "recipes", parse_recipe),
+        bridges=_layer(base, personal, "bridges", parse_bridge),
+        recipes=_layer(base, personal, "recipes", parse_recipe),
         roles=_load_roles(base),
     )
 

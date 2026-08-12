@@ -69,7 +69,7 @@ def test_python_module_strategy():
 
 def test_python_module_checked_with_pinned_interpreter():
     """Регрессия: модуль проверялся системным python3, а не venv провайдера,
-    поэтому скан считал ben-voice и ben-embed доступными до первого падения."""
+    поэтому скан считал обёртки со своим venv доступными до первого падения."""
     seen: list[str] = []
 
     def runner(command, *, timeout):

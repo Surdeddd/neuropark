@@ -1,11 +1,7 @@
 {
   "id": "local",
   "kind": "local",
-  "os": "darwin",
   "auto": true,
-  "paths": {
-    "models": "~/Models",
-    "scripts": "~/scripts"
-  },
-  "notes": "macbook на подписке Max: env намеренно пустой — сюда нельзя пускать API-ключ, биллинг идёт через подписку"
+  "paths": {},
+  "notes": "This machine. Add paths here if your manifests reference them via {host.paths.key}. Keep env empty unless a local tool truly needs a key: a subscription-based CLI must not see an API key. / Эта машина. Пути добавляй сюда, если манифесты ссылаются на них через {host.paths.key}. env держи пустым, пока локальному инструменту действительно не нужен ключ: CLI на подписке не должен видеть API-ключ."
 }

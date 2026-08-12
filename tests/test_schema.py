@@ -75,7 +75,7 @@ def test_parse_host_defaults_auto_true_for_local():
 
 def test_parse_host_requires_addr_for_ssh():
     with pytest.raises(NnError) as err:
-        parse_host({"id": "winpc", "kind": "ssh"}, source="hosts/winpc.json")
+        parse_host({"id": "gpu-box", "kind": "ssh"}, source="hosts/gpu-box.json")
     assert "addr" in err.value.message
 
 

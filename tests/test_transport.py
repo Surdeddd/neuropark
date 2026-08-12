@@ -5,7 +5,7 @@ from nn.model import Host
 from nn.transport import LocalTransport, ManualTransport, get_transport, resolve_env
 
 LOCAL = Host(id="local", kind="local")
-MANUAL_HOST = Host(id="winpc", kind="ssh", addr="winpc-cc", auto=False)
+MANUAL_HOST = Host(id="gpu-box", kind="ssh", addr="gpu-box", auto=False)
 
 
 def test_local_transport_runs_command(tmp_path):
@@ -54,7 +54,7 @@ def test_manual_transport_does_not_execute(tmp_path):
     )
     assert result.exit_code == int(Exit.MANUAL)
     assert not (tmp_path / "out.txt").exists()
-    assert "ssh winpc-cc" in result.command
+    assert "ssh gpu-box" in result.command
 
 
 def test_get_transport_respects_auto_false():
@@ -66,7 +66,7 @@ def test_get_transport_manual_kind():
 
 
 def test_ssh_transport_not_available_yet():
-    host = Host(id="mini", kind="ssh", addr="mac-mini", auto=True)
+    host = Host(id="mini", kind="ssh", addr="remote-box", auto=True)
     with pytest.raises(NnError) as err:
         get_transport(host)
     assert err.value.code == Exit.BAD_DATA

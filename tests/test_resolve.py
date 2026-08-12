@@ -93,9 +93,9 @@ def test_provider_absent_from_registry_is_rejected():
 def test_local_wins_over_remote_at_equal_rank():
     hosts = {
         "local": Host(id="local", kind="local"),
-        "winpc": Host(id="winpc", kind="ssh", addr="w", auto=False),
+        "gpu-box": Host(id="gpu-box", kind="ssh", addr="w", auto=False),
     }
-    catalog, registry = build([prov("remote", host="winpc"), prov("here")], hosts=hosts)
+    catalog, registry = build([prov("remote", host="gpu-box"), prov("here")], hosts=hosts)
     choice = resolve("transcribe", catalog=catalog, registry=registry, in_type="audio")
     assert choice.provider.id == "here"
 
@@ -103,9 +103,9 @@ def test_local_wins_over_remote_at_equal_rank():
 def test_manual_host_is_chosen_but_flagged():
     hosts = {
         "local": Host(id="local", kind="local"),
-        "winpc": Host(id="winpc", kind="ssh", addr="w", auto=False),
+        "gpu-box": Host(id="gpu-box", kind="ssh", addr="w", auto=False),
     }
-    catalog, registry = build([prov("remote", host="winpc")], hosts=hosts)
+    catalog, registry = build([prov("remote", host="gpu-box")], hosts=hosts)
     choice = resolve("transcribe", catalog=catalog, registry=registry, in_type="audio")
     assert choice.manual is True
 

@@ -7,24 +7,18 @@
     "bin": "claude"
   },
   "vars": {
-    "lang": "ru"
+    "lang": "en"
   },
   "io": {
-    "in": [
-      "srt",
-      "text"
-    ],
+    "in": ["srt", "text"],
     "out": "same"
   },
-  "run": "claude -p \"Переведи на {lang}. Если это SRT — сохрани нумерацию и тайминги без изменений, переводи только текстовые строки. Верни только результат, без пояснений.\" < {in} > {out}",
+  "run": "claude -p \"Translate into {lang}. If this is SRT, keep the numbering and timings untouched and translate only the text lines. Return the result only, with no explanations.\" < {in} > {out}",
   "timeout_s": 900,
   "window_h": 5,
-  "quota_patterns": [
-    "usage limit",
-    "rate limit"
-  ],
+  "quota_patterns": ["usage limit", "rate limit"],
   "notes": {
-    "en": "Max subscription, no API key. Keeps timings untouched. Long subtitle files may hit the window — split the input then. window_h=5 is the Anthropic rolling window; soft_cap is unset on purpose: the exact call limit is unknown and exhaustion is caught by quota_patterns from stderr",
-    "ru": "подписка Max, без API-ключа. тайминги не трогает. на длинных сабах может упереться в окно — тогда режь вход. window_h=5 — скользящее окно подписки Anthropic; soft_cap не задан намеренно: точный лимит вызовов неизвестен, исчерпание ловится по quota_patterns из stderr"
+    "en": "Translation through the Claude CLI, timings preserved. Target language in vars.lang — override per recipe step. window_h=5 is the Anthropic rolling window; soft_cap is left unset because the exact call limit is unknown, so exhaustion is caught from stderr instead.",
+    "ru": "Перевод через Claude CLI, тайминги сохраняются. Целевой язык в vars.lang — переопределяется на шаге рецепта. window_h=5 — скользящее окно Anthropic; soft_cap не задан, потому что точный лимит вызовов неизвестен, исчерпание ловится по stderr."
   }
 }

@@ -1,0 +1,20 @@
+{
+  "id": "remote-comfyui",
+  "capability": "image",
+  "kind": "model",
+  "host": "gpu-box",
+  "rank": 9,
+  "detect": {
+    "http": "http://127.0.0.1:8188/system_stats"
+  },
+  "io": {
+    "in": ["text"],
+    "out": "image"
+  },
+  "run": "python D:/comfy/run_workflow.py --workflow my_workflow --prompt \"$(cat {in})\" --out {out}",
+  "timeout_s": 1800,
+  "notes": {
+    "en": "A tool living on another machine. It stays in the catalog and in `nn why`, but with auto=false on its host nn only prints the ssh command instead of running it — that keeps the whole class of sleep-and-network bugs out. Pair this with examples/hosts/gpu-box.json.",
+    "ru": "Инструмент на другой машине. Он остаётся в каталоге и в `nn why`, но при auto=false у хоста nn лишь печатает ssh-команду, а не запускает — так весь класс багов про сон и сеть остаётся снаружи. Используй вместе с examples/hosts/gpu-box.json."
+  }
+}

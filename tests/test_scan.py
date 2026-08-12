@@ -62,13 +62,13 @@ def test_unreachable_host_yields_stale_and_keeps_previous_data(monkeypatch, tmp_
     monkeypatch.setenv("NN_STATE", str(tmp_path))
     hosts = {
         "local": Host(id="local", kind="local"),
-        "winpc": Host(id="winpc", kind="ssh", addr="winpc-cc", probe="ssh winpc-cc true"),
+        "gpu-box": Host(id="gpu-box", kind="ssh", addr="gpu-box", probe="ssh gpu-box true"),
     }
-    prov = provider("comfy", host="winpc")
+    prov = provider("comfy", host="gpu-box")
     previous = Registry(
         hostname="testbox",
         generated_at="2026-08-01T00:00:00+00:00",
-        entries={"comfy": Entry("comfy", "winpc", "ok", "", "1.0", "2026-08-01T00:00:00+00:00")},
+        entries={"comfy": Entry("comfy", "gpu-box", "ok", "", "1.0", "2026-08-01T00:00:00+00:00")},
     )
 
     def runner(command, *, timeout):
@@ -101,7 +101,7 @@ def test_host_probe_runs_once_per_host(monkeypatch, tmp_path):
     monkeypatch.setenv("NN_STATE", str(tmp_path))
     hosts = {
         "local": Host(id="local", kind="local"),
-        "mini": Host(id="mini", kind="ssh", addr="mac-mini", probe="ssh mac-mini true"),
+        "mini": Host(id="mini", kind="ssh", addr="remote-box", probe="ssh remote-box true"),
     }
     calls: list[str] = []
 
@@ -114,4 +114,4 @@ def test_host_probe_runs_once_per_host(monkeypatch, tmp_path):
         runner=runner,
         now=NOW,
     )
-    assert calls.count("ssh mac-mini true") == 1
+    assert calls.count("ssh remote-box true") == 1

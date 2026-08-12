@@ -9,7 +9,7 @@ from nn.run import execute, exit_code_for
 
 NOW = datetime(2026, 8, 12, 10, 0, tzinfo=UTC)
 LOCAL = Host(id="local", kind="local")
-MANUAL_HOST = Host(id="winpc", kind="ssh", addr="winpc-cc", auto=False)
+MANUAL_HOST = Host(id="gpu-box", kind="ssh", addr="gpu-box", auto=False)
 CAPS = {"transcribe": Capability("transcribe", ("audio",), "srt")}
 TYPES = {"audio": ("wav", "ogg"), "srt": ("srt",), "text": ("txt",)}
 
@@ -125,7 +125,7 @@ def test_failing_provider_gives_crash_and_exit_four(monkeypatch, tmp_path):
 def test_manual_host_prints_command_and_exits_three(monkeypatch, tmp_path):
     monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
     env = execute(
-        choice(prov(host="winpc"), host=MANUAL_HOST),
+        choice(prov(host="gpu-box"), host=MANUAL_HOST),
         catalog=catalog(),
         in_path="a.wav",
         work_dir=str(tmp_path),
@@ -133,7 +133,7 @@ def test_manual_host_prints_command_and_exits_three(monkeypatch, tmp_path):
     )
     assert env.status == "manual"
     assert env.command is not None
-    assert "ssh winpc-cc" in env.command
+    assert "ssh gpu-box" in env.command
     assert exit_code_for(env) == Exit.MANUAL
 
 
@@ -235,7 +235,7 @@ def test_envelope_json_uses_in_key_not_in_path(monkeypatch, tmp_path):
 def test_manual_run_is_not_written_to_runlog(monkeypatch, tmp_path):
     monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
     execute(
-        choice(prov(host="winpc"), host=MANUAL_HOST),
+        choice(prov(host="gpu-box"), host=MANUAL_HOST),
         catalog=catalog(),
         in_path="a.wav",
         work_dir=str(tmp_path),

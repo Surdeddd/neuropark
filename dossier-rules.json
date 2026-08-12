@@ -15,7 +15,7 @@
     },
     {
       "match": "connection refused",
-      "instruction": "хост не поднят: проверь probe в файле хоста, для winpc — не спит ли машина"
+      "instruction": "хост не поднят: проверь probe в файле хоста и не спит ли машина"
     },
     {
       "match": "no such file or directory",

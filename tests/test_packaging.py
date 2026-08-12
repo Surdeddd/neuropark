@@ -82,8 +82,33 @@ def test_readme_exists_in_both_languages():
     russian = (ROOT / "README.ru.md").read_text(encoding="utf-8")
     assert "README.ru.md" in english
     assert "README.md" in russian
-    assert "neural park catalog" in english.lower()
-    assert "каталог парка нейронок" in russian
+    assert "one command to call any of them" in english.lower()
+    assert "одна команда, чтобы позвать любую" in russian.lower()
+
+
+def test_readmes_cover_the_same_sections():
+    """Русская версия — полноценная, а не обрезок английской."""
+    english = (ROOT / "README.md").read_text(encoding="utf-8")
+    russian = (ROOT / "README.ru.md").read_text(encoding="utf-8")
+    pairs = [
+        ("## Quick start", "## Быстрый старт"),
+        ("## How it works", "## Как это работает"),
+        ("## Add a tool", "## Добавить нейронку"),
+        ("## Chains", "## Цепочки"),
+        ("## Orchestration", "## Оркестрация"),
+        ("## Exit codes", "## Коды выхода"),
+        ("## Language", "## Язык"),
+        ("## Development", "## Разработка"),
+        ("## License", "## Лицензия"),
+    ]
+    for en_section, ru_section in pairs:
+        assert en_section in english, en_section
+        assert ru_section in russian, ru_section
+
+
+def test_license_file_exists():
+    text = (ROOT / "LICENSE").read_text(encoding="utf-8")
+    assert "MIT License" in text
 
 
 def test_memory_bank_follows_canonical_structure():

@@ -19,10 +19,19 @@ def state_dir() -> Path:
 
 
 def data_dir() -> Path:
+    """Данные, поставляемые с nn: общие манифесты, мостики, рецепты."""
     raw = os.environ.get("NN_DATA")
     if raw:
         return Path(raw).expanduser()
     return Path(__file__).resolve().parents[2]
+
+
+def user_data_dir() -> Path:
+    """Личные данные пользователя. Перекрывают поставляемые при совпадении id."""
+    raw = os.environ.get("NN_HOME")
+    path = Path(raw).expanduser() if raw else state_dir() / "data"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def expand(value: str, *, env: Mapping[str, str] | None = None) -> str:

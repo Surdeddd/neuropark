@@ -161,14 +161,14 @@ def test_should_auto_learn_threshold(monkeypatch, tmp_path):
 
 
 def test_real_ben_voice_failure_yields_interpreter_advice():
-    """Настоящий stderr от падения ben-voice 2026-08-12 обязан дать совет про интерпретатор."""
+    """Настоящий stderr от падения обёртки со своим venv обязан дать совет про интерпретатор."""
     real = (
         "Traceback (most recent call last):\n"
-        '  File "/Users/x/scripts/ben-voice.py", line 311, in <module>\n'
+        '  File "/opt/tools/tts-wrapper.py", line 311, in <module>\n'
         "ModuleNotFoundError: No module named 'mlx_audio'"
     )
     rules = load_rules(Path(__file__).resolve().parents[1])
-    lessons = distill([rec(provider="ben-voice-clone", stderr=real) for _ in range(3)], rules)
+    lessons = distill([rec(provider="tts-wrapper", stderr=real) for _ in range(3)], rules)
     advice = [lesson.instruction for lesson in lessons if lesson.instruction]
     assert any("интерпретатор" in text for text in advice)
 
@@ -177,7 +177,7 @@ def test_real_ffmpeg_container_failure_yields_out_ext_advice():
     """И второй сегодняшний случай: ffmpeg не смог записать контейнер → совет про out_ext."""
     real = "[out#0/wav] Nothing was written into output file, because at least one stream"
     rules = load_rules(Path(__file__).resolve().parents[1])
-    lessons = distill([rec(provider="ben-voice-clone", stderr=real) for _ in range(3)], rules)
+    lessons = distill([rec(provider="tts-wrapper", stderr=real) for _ in range(3)], rules)
     advice = [lesson.instruction for lesson in lessons if lesson.instruction]
     assert any("out_ext" in text for text in advice)
 

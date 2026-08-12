@@ -1,0 +1,27 @@
+{
+  "id": "python-script-with-own-venv",
+  "capability": "tts",
+  "kind": "model",
+  "rank": 5,
+  "detect": {
+    "files": [
+      "~/scripts/my-tts.py",
+      "~/venvs/my-tts/bin/python3"
+    ],
+    "python": "the_module_your_script_imports"
+  },
+  "vars": {
+    "py": "~/venvs/my-tts/bin/python3"
+  },
+  "io": {
+    "in": ["text"],
+    "out": "audio",
+    "out_ext": "ogg"
+  },
+  "run": "{py} ~/scripts/my-tts.py --out {out} \"$(cat {in})\"",
+  "timeout_s": 1800,
+  "notes": {
+    "en": "Pattern for a wrapper script that needs its own interpreter. Two rules learned the hard way: pin the interpreter in vars.py, and declare detect.python so a missing dependency shows up in nn scan instead of at first run. Set io.out_ext when the script writes a container different from the type's default extension.",
+    "ru": "Шаблон для скрипта-обёртки со своим интерпретатором. Два правила, добытых болью: закрепи интерпретатор в vars.py и объяви detect.python, чтобы пропавшая зависимость всплыла в nn scan, а не при первом запуске. io.out_ext задавай, когда скрипт пишет контейнер, не совпадающий с расширением по умолчанию."
+  }
+}

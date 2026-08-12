@@ -110,6 +110,19 @@ def build_parser() -> argparse.ArgumentParser:
     recipe_run.add_argument("recipe_id")
     recipe_run.add_argument("input")
 
+    init_cmd = subs.add_parser(
+        "init",
+        help=bi(
+            "detect installed tools and write manifests",
+            "найти установленные инструменты и записать манифесты",
+        ),
+    )
+    init_cmd.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=bi("only show what would be written", "только показать, что было бы записано"),
+    )
+
     subs.add_parser("adapt", help=bi("build roles.json for this machine", "собрать roles.json"))
 
     orch = subs.add_parser(
@@ -302,6 +315,74 @@ def _cmd_run(args: argparse.Namespace) -> int:
         print(f"\n{label}:\n{envelope.command}", file=sys.stderr)
     _auto_learn()
     return int(exit_code_for(envelope))
+
+
+def _cmd_init(args: argparse.Namespace) -> int:
+    from nn.init import discover, ensure_local_host, write_manifests
+
+    candidates = discover()
+    rows = [
+        [
+            item.id,
+            item.capability,
+            bi("found", "найден") if item.found else bi("absent", "нет"),
+            (item.model or "-") if item.found else item.reason,
+        ]
+        for item in candidates
+    ]
+    headers = [
+        bi("tool", "инструмент"),
+        "capability",
+        bi("state", "состояние"),
+        bi("model / reason", "модель / причина"),
+    ]
+    if args.json:
+        payload = [
+            {
+                "id": item.id,
+                "capability": item.capability,
+                "found": item.found,
+                "reason": item.reason,
+                "model": item.model,
+                "needs_editing": item.needs_editing,
+            }
+            for item in candidates
+        ]
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return int(Exit.OK)
+
+    print(table(rows, headers))
+    found = [item for item in candidates if item.found]
+    if not found:
+        print(
+            bi(
+                "\nnothing detected. Install a tool or write a manifest by hand:"
+                " see examples/providers",
+                "\nничего не найдено. Поставь инструмент либо напиши манифест руками:"
+                " смотри examples/providers",
+            )
+        )
+        return int(Exit.OK)
+
+    if args.dry_run:
+        names = ", ".join(item.id for item in found)
+        print(bi(f"\nwould write: {names}", f"\nбыли бы записаны: {names}"))
+        return int(Exit.OK)
+
+    host = ensure_local_host()
+    written = write_manifests(found)
+    print(bi(f"\nwritten manifests: {len(written)}", f"\nзаписано манифестов: {len(written)}"))
+    print(f"  {written[0].parent}" if written else f"  {host.parent}")
+    needs = [item.id for item in found if item.needs_editing]
+    if needs:
+        print(
+            bi(
+                f"needs your editing before use: {', '.join(needs)}",
+                f"требуют правки перед использованием: {', '.join(needs)}",
+            )
+        )
+    print(bi("next: nn scan && nn ls", "дальше: nn scan && nn ls"))
+    return int(Exit.OK)
 
 
 def _cmd_adapt(as_json: bool) -> int:
@@ -592,6 +673,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_quota(args.json)
         if args.command == "learn":
             return _cmd_learn(args.json)
+        if args.command == "init":
+            return _cmd_init(args)
         if args.command == "adapt":
             return _cmd_adapt(args.json)
         if args.command == "orchestrate":

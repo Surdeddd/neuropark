@@ -1,0 +1,219 @@
+{
+  "_comment": "Known tools nn can wire up automatically. `nn init` probes each one and writes a manifest for whatever is present. Paths use globs so no machine-specific path is hardcoded. / Известные инструменты, которые nn подключает сам. `nn init` проверяет каждый и пишет манифест для найденного.",
+  "priors": [
+    {
+      "id": "whisper-cpp",
+      "capability": "transcribe",
+      "kind": "model",
+      "rank": 10,
+      "probe": { "bin": "whisper-cli", "model_glob": ["~/Models/whisper/ggml-*.bin", "~/.local/share/whisper/ggml-*.bin", "~/Library/Caches/whisper.cpp/ggml-*.bin", "/usr/local/share/whisper/ggml-*.bin"] },
+      "io": { "in": ["audio"], "out": "srt" },
+      "pre": "ffmpeg -nostdin -y -i {in} -ar 16000 -ac 1 {tmp}.wav",
+      "run": "whisper-cli -m {model} -f {tmp}.wav -osrt -of {out_base} -l auto",
+      "timeout_s": 3600,
+      "notes": {
+        "en": "whisper.cpp, offline. The largest model found on disk is picked; edit vars.model to change it",
+        "ru": "whisper.cpp, офлайн. Берётся самая крупная найденная модель; сменить — правкой vars.model"
+      }
+    },
+    {
+      "id": "faster-whisper",
+      "capability": "transcribe",
+      "kind": "model",
+      "rank": 8,
+      "probe": { "python": "faster_whisper" },
+      "io": { "in": ["audio"], "out": "srt" },
+      "run": "python3 -m faster_whisper --model large-v3 --output_format srt --output_dir {dir} {in}",
+      "timeout_s": 3600,
+      "notes": {
+        "en": "faster-whisper via CTranslate2, GPU-friendly",
+        "ru": "faster-whisper на CTranslate2, дружелюбен к GPU"
+      }
+    },
+    {
+      "id": "ollama",
+      "capability": "text",
+      "kind": "agent",
+      "rank": 5,
+      "probe": { "bin": "ollama", "http": "http://127.0.0.1:11434/api/tags" },
+      "io": { "in": ["text"], "out": "text" },
+      "run": "ollama run llama3 \"$(cat {prompt_file})\" > {out}",
+      "timeout_s": 1800,
+      "notes": {
+        "en": "local models through ollama, fully offline. Change the model name in run",
+        "ru": "локальные модели через ollama, полностью офлайн. Имя модели меняется в run"
+      }
+    },
+    {
+      "id": "piper-tts",
+      "capability": "tts",
+      "kind": "model",
+      "rank": 6,
+      "probe": { "bin": "piper", "model_glob": ["~/.local/share/piper/*.onnx", "~/piper/*.onnx"] },
+      "io": { "in": ["text"], "out": "audio" },
+      "run": "piper --model {model} --output_file {out} < {in}",
+      "timeout_s": 600,
+      "notes": {
+        "en": "Piper TTS, offline, fast on CPU",
+        "ru": "Piper TTS, офлайн, быстрый на CPU"
+      }
+    },
+    {
+      "id": "ffmpeg-audio-clean",
+      "capability": "audio-clean",
+      "kind": "tool",
+      "rank": 10,
+      "probe": { "bin": "ffmpeg-normalize", "model_glob": ["~/Models/rnnoise/*.rnnn", "~/.local/share/rnnoise/*.rnnn"], "model_prefer": ["sh.rnnn", "bd.rnnn"] },
+      "io": { "in": ["audio"], "out": "audio" },
+      "pre": "ffmpeg -nostdin -y -i {in} -af arnndn=m={model} {tmp}.wav",
+      "run": "ffmpeg-normalize {tmp}.wav -o {out} -f",
+      "timeout_s": 900,
+      "notes": {
+        "en": "rnnoise denoise plus EBU R128 loudness normalisation",
+        "ru": "шумодав rnnoise плюс нормализация громкости по EBU R128"
+      }
+    },
+    {
+      "id": "ffmpeg-compose",
+      "capability": "compose",
+      "kind": "tool",
+      "rank": 10,
+      "probe": { "bin": "ffmpeg" },
+      "io": { "in": ["video"], "out": "video" },
+      "run": "ffmpeg -nostdin -y -i {in} -i {extra0} -c:v copy -map 0:v:0 -map 1:a:0 -shortest {out}",
+      "timeout_s": 1800,
+      "notes": {
+        "en": "replace the audio track: video from the main input, sound from --extra",
+        "ru": "подмена звуковой дорожки: видео из основного входа, звук из --extra"
+      }
+    },
+    {
+      "id": "ffmpeg-subtitle-burn",
+      "capability": "subtitle-burn",
+      "kind": "tool",
+      "rank": 10,
+      "probe": { "bin": "ffmpeg" },
+      "io": { "in": ["video"], "out": "video" },
+      "run": "ffmpeg -nostdin -y -i {in} -vf subtitles={extra0}:force_style='FontSize=18' -c:a copy {out}",
+      "timeout_s": 3600,
+      "notes": {
+        "en": "burn subtitles into the picture, subtitles come via --extra",
+        "ru": "вжигание сабов в картинку, сабы приходят через --extra"
+      }
+    },
+    {
+      "id": "claude-text",
+      "capability": "text",
+      "kind": "agent",
+      "rank": 10,
+      "probe": { "bin": "claude" },
+      "io": { "in": ["text"], "out": "text" },
+      "run": "claude -p \"$(cat {prompt_file})\" > {out}",
+      "timeout_s": 1800,
+      "window_h": 5,
+      "quota_patterns": ["usage limit", "rate limit"],
+      "roles": ["core", "review"],
+      "notes": {
+        "en": "Claude Code CLI. Strong on architecture and code review",
+        "ru": "Claude Code CLI. Силён на архитектуре и разборе кода"
+      }
+    },
+    {
+      "id": "codex-text",
+      "capability": "text",
+      "kind": "agent",
+      "rank": 8,
+      "probe": { "bin": "codex" },
+      "io": { "in": ["text"], "out": "text" },
+      "run": "codex exec --skip-git-repo-check -o {out} \"$(cat {prompt_file})\"",
+      "timeout_s": 1800,
+      "window_h": 5,
+      "quota_patterns": ["usage limit", "rate limit", "quota"],
+      "roles": ["spec", "mechanics"],
+      "notes": {
+        "en": "OpenAI Codex CLI. Good at following a narrow spec; -o writes the last message to a file",
+        "ru": "Codex CLI от OpenAI. Хорош в следовании узкой спеке; -o кладёт последнее сообщение в файл"
+      }
+    },
+    {
+      "id": "grok-text",
+      "capability": "text",
+      "kind": "agent",
+      "rank": 6,
+      "probe": { "bin": "grok" },
+      "io": { "in": ["text"], "out": "text" },
+      "run": "grok --prompt-file {prompt_file} --output-format text > {out}",
+      "timeout_s": 1800,
+      "quota_patterns": ["usage limit", "rate limit", "quota", "too many requests"],
+      "roles": ["mechanics", "scout"],
+      "notes": {
+        "en": "Grok CLI, supports --prompt-file. window_h left unset: window length unverified",
+        "ru": "Grok CLI, умеет --prompt-file. window_h не задан: длина окна не выяснена"
+      }
+    },
+    {
+      "id": "kimi-text",
+      "capability": "text",
+      "kind": "agent",
+      "rank": 5,
+      "probe": { "bin": "kimi" },
+      "io": { "in": ["text"], "out": "text" },
+      "run": "kimi -p \"$(cat {prompt_file})\" --output-format text > {out}",
+      "timeout_s": 1800,
+      "quota_patterns": ["usage limit", "rate limit", "quota", "too many requests"],
+      "roles": ["frontend", "review"],
+      "notes": {
+        "en": "Kimi CLI, cheap second pass",
+        "ru": "Kimi CLI, дешёвый второй проход"
+      }
+    },
+    {
+      "id": "gemini-text",
+      "capability": "text",
+      "kind": "agent",
+      "rank": 5,
+      "probe": { "bin": "gemini" },
+      "io": { "in": ["text"], "out": "text" },
+      "run": "gemini -p \"$(cat {prompt_file})\" > {out}",
+      "timeout_s": 1800,
+      "quota_patterns": ["quota", "rate limit", "resource exhausted"],
+      "roles": ["review"],
+      "notes": {
+        "en": "Gemini CLI",
+        "ru": "Gemini CLI"
+      }
+    },
+    {
+      "id": "claude-translate",
+      "capability": "translate",
+      "kind": "agent",
+      "rank": 10,
+      "probe": { "bin": "claude" },
+      "vars": { "lang": "ru" },
+      "io": { "in": ["srt", "text"], "out": "same" },
+      "run": "claude -p \"Translate into {lang}. If this is SRT, keep numbering and timings untouched and translate only the text lines. Return the result only.\" < {in} > {out}",
+      "timeout_s": 900,
+      "window_h": 5,
+      "quota_patterns": ["usage limit", "rate limit"],
+      "notes": {
+        "en": "translation through Claude, timings preserved. Target language in vars.lang",
+        "ru": "перевод через Claude, тайминги сохраняются. Целевой язык в vars.lang"
+      }
+    },
+    {
+      "id": "comfyui",
+      "capability": "image",
+      "kind": "model",
+      "rank": 7,
+      "probe": { "http": "http://127.0.0.1:8188/system_stats" },
+      "io": { "in": ["text"], "out": "image" },
+      "run": "echo 'fill in your ComfyUI workflow runner here' && false",
+      "timeout_s": 1800,
+      "needs_editing": true,
+      "notes": {
+        "en": "ComfyUI is reachable, but the workflow runner is yours to plug in: edit run in the generated manifest",
+        "ru": "ComfyUI доступен, но запускатель воркфлоу твой: поправь run в сгенерированном манифесте"
+      }
+    }
+  ]
+}

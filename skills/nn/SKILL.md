@@ -1,6 +1,6 @@
 ---
 name: nn
-description: Catalog of every neural tool the user owns plus a single calling contract. Русский и английский. Call it to (1) find out what can do a job — "what can transcribe this", "what do I have for images", "which model for voice", "what runs on winpc", «чем транскрибировать», «что у меня есть для картинок», «какой моделью озвучить»; (2) perform a media operation — transcript, voiceover, image generation, embedding, audio cleanup, burning subtitles, swapping an audio track, транскрипт, озвучка, генерация картинки, эмбеддинг, чистка звука, вжигание сабов; (3) chain several tools together / связать нейронки в цепочку; (4) drive a task through several models with cross-review / прогнать задачу через несколько моделей с кросс-ревью. Triggers — nn, neural park, "what can do this", "which models do I have", transcribe, voice over, generate image, make subtitles, how much quota is left, «парк нейронок», «чем это сделать», «какие у меня модели», транскрибируй, озвучь, сгенери картинку, сделай сабы, «сколько квоты осталось».
+description: Catalog of every neural tool the user owns plus a single calling contract. Русский и английский. Call it to (1) find out what can do a job — "what can transcribe this", "what do I have for images", "which model for voice", "what runs on the gpu box", «чем транскрибировать», «что у меня есть для картинок», «какой моделью озвучить»; (2) perform a media operation — transcript, voiceover, image generation, embedding, audio cleanup, burning subtitles, swapping an audio track, транскрипт, озвучка, генерация картинки, эмбеддинг, чистка звука, вжигание сабов; (3) chain several tools together / связать нейронки в цепочку; (4) drive a task through several models with cross-review / прогнать задачу через несколько моделей с кросс-ревью. Triggers — nn, neural park, "what can do this", "which models do I have", transcribe, voice over, generate image, make subtitles, how much quota is left, «парк нейронок», «чем это сделать», «какие у меня модели», транскрибируй, озвучь, сгенери картинку, сделай сабы, «сколько квоты осталось».
 ---
 
 # nn — парк нейронок / neural park
@@ -24,9 +24,12 @@ description: Catalog of every neural tool the user owns plus a single calling co
 
 Реестр парка может быть просрочен. Если любая команда вернула код 5 — сделай `nn scan` (он же покажет, что изменилось с прошлого раза). Скан запускается только руками: никаких расписаний и фоновых заданий тут нет намеренно.
 
+Если каталог пуст или инструмент явно есть в системе, но его нет в `nn ls` — сделай `nn init`: он находит установленное по `priors.json` и пишет манифесты в личную директорию пользователя (`$NN_HOME`, по умолчанию `~/.claude/nn/data`). Личные манифесты перекрывают поставляемые с тем же id.
+
 ## Команды
 
 ```bash
+nn init                             # найти установленное и записать манифесты
 nn ls [capability]                  # весь парк или один capability
 nn why <capability> [--in-type T]   # кто выбран, кто отклонён и почему
 nn run <capability> <вход> [-o out] # выполнить; --provider пришпилить, --extra доп. вход
@@ -58,4 +61,4 @@ nn stats                            # что реально использует
 
 ## Когда чего-то не хватает
 
-Нет нужного capability или провайдера — не изобретай вызов руками. Добавь манифест: один JSON-файл в `providers/`, поля описаны в README плагина. Так знание останется в каталоге, а не потеряется в переписке.
+Нет нужного capability или провайдера — не изобретай вызов руками. Сначала `nn init`: возможно, инструмент установлен и его достаточно подключить. Если нет — добавь манифест: один JSON-файл в `$NN_HOME/providers/`, поля описаны в README, готовые шаблоны в `examples/providers/`. Так знание останется в каталоге, а не потеряется в переписке.

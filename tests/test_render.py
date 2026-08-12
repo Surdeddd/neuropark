@@ -54,7 +54,7 @@ def test_render_supports_dotted_host_paths():
 
 
 def test_build_context_expands_vars_and_host_paths():
-    host = Host(id="winpc", kind="ssh", addr="w", paths={"models": "D:/models"})
+    host = Host(id="gpu-box", kind="ssh", addr="w", paths={"models": "D:/models"})
     ctx = build_context(
         prov(),
         host,

@@ -69,7 +69,7 @@ def signature(stderr_tail: str) -> str:
 
     Берётся ПОСЛЕДНЯЯ непустая строка: у питоновского трейсбека первая строка
     всегда «Traceback (most recent call last):», а суть — в последней. Проверено
-    на реальном падении ben-voice 2026-08-12.
+    на реальном падении обёртки со своим venv, 2026-08-12.
     """
     lines = [line.strip() for line in stderr_tail.splitlines() if line.strip()]
     last = lines[-1] if lines else ""
