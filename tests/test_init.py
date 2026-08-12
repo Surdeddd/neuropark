@@ -109,10 +109,20 @@ def test_every_repo_prior_generates_a_valid_manifest():
 
 
 def test_write_manifests_and_load_them(tmp_path, monkeypatch):
+    """Найденное записывается манифестами, которые каталог потом читает.
+
+    Приоры берутся синтетические: раньше тест брал репозиторные и требовал, чтобы
+    на машине хоть что-то стояло. На пустом macOS-раннере не стояло ничего, и CI
+    падал не из-за дефекта nn, а из-за железа под тестом.
+    """
     monkeypatch.setenv("NN_HOME", str(tmp_path))
     monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
-    found = [item for item in discover(root=ROOT) if item.found]
-    assert found, "на этой машине не нашлось ни одного инструмента из приоров"
+    priors = tmp_path / "priors"
+    priors.mkdir()
+    (priors / "priors.json").write_text(json.dumps({"priors": [PRIOR_BIN]}), encoding="utf-8")
+
+    found = [item for item in discover(root=priors) if item.found]
+    assert found, "printf есть на любой POSIX-машине — приор обязан найтись"
     ensure_local_host()
     written = write_manifests(found)
     assert written
@@ -120,6 +130,21 @@ def test_write_manifests_and_load_them(tmp_path, monkeypatch):
     catalog = load_catalog(ROOT, user_root=tmp_path)
     for item in found:
         assert item.id in catalog.providers
+
+
+def test_discover_on_a_bare_machine_reports_absence_instead_of_failing(tmp_path, monkeypatch):
+    """На машине без инструментов discover обязан вернуть список «не найдено», а не упасть."""
+    monkeypatch.setenv("NN_HOME", str(tmp_path))
+    monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
+    priors = tmp_path / "priors"
+    priors.mkdir()
+    absent = dict(PRIOR_BIN, id="ghost-tool", probe={"bin": "definitely-not-installed-xyz"})
+    (priors / "priors.json").write_text(json.dumps({"priors": [absent]}), encoding="utf-8")
+
+    items = discover(root=priors)
+    assert [item.id for item in items] == ["ghost-tool"]
+    assert not any(item.found for item in items)
+    assert items[0].reason
 
 
 def test_ensure_local_host_is_idempotent(tmp_path, monkeypatch):
