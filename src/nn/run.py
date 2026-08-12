@@ -107,7 +107,11 @@ def execute(
         if with_dossier:
             advice = instructions_for(provider.id)
             if advice:
-                body = f"Учти известные грабли этого инструмента:\n{advice}\n\n{prompt}"
+                preamble = bi(
+                    "Mind the known gotchas of this tool:",
+                    "Учти известные грабли этого инструмента:",
+                )
+                body = f"{preamble}\n{advice}\n\n{prompt}"
         prompt_file = str(_out_dir() / f"{run_id}-prompt.txt")
         Path(prompt_file).write_text(body, encoding="utf-8")
 
@@ -206,7 +210,7 @@ def execute(
         )
         if outcome == "success" or outcome in NO_RETRY or attempt == attempts - 1:
             break
-        log_parts.append(f"-- повтор после исхода {outcome} --")
+        log_parts.append(f"-- retry after outcome {outcome} --")
 
     log_file.write_text("\n".join(log_parts), encoding="utf-8")
     status = "ok" if outcome == "success" else "error"

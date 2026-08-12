@@ -143,3 +143,134 @@ def test_version_in_plugin_matches_cli():
     version = re.search(r'VERSION = "([^"]+)"', cli)
     assert version is not None
     assert payload["version"] == version.group(1)
+
+
+def _declared_version() -> str:
+    cli = (ROOT / "src" / "nn" / "cli.py").read_text(encoding="utf-8")
+    version = re.search(r'VERSION = "([^"]+)"', cli)
+    assert version is not None
+    return version.group(1)
+
+
+def test_pyproject_version_matches_cli():
+    """Третье место с версией уже успело отстать один раз — теперь оно под тестом."""
+    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert f'version = "{_declared_version()}"' in text
+
+
+def test_changelog_documents_the_current_version():
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert f"## {_declared_version()}" in text
+
+
+def test_contributing_states_the_data_first_path():
+    text = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+    assert "priors.json" in text
+    assert "stdlib" in text
+    for russian in ("Как участвовать", "мостика"):
+        assert russian in text, russian
+
+
+def test_hook_manifest_wires_session_start_through_plugin_root():
+    payload = json.loads((ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
+    entries = payload["hooks"]["SessionStart"]
+    commands = [hook["command"] for entry in entries for hook in entry["hooks"]]
+    assert commands, "SessionStart без команд"
+    for command in commands:
+        assert "${CLAUDE_PLUGIN_ROOT}" in command, command
+        assert "session-start.sh" in command
+
+
+def test_hook_scripts_are_executable_and_syntax_clean():
+    for name in ("session-start.sh", "pre-commit"):
+        script = ROOT / "hooks" / name
+        assert script.is_file(), name
+        assert script.stat().st_mode & 0o111, f"{name} не исполняемый"
+        syntax = subprocess.run(
+            ["bash", "-n", str(script)], capture_output=True, text=True, check=False
+        )
+        assert syntax.returncode == 0, syntax.stderr
+
+
+def test_session_start_hook_is_silent_when_the_park_is_healthy(tmp_path):
+    """Хук, который здоровается каждую сессию, начинают игнорировать."""
+    state = tmp_path / "state"
+    data = tmp_path / "data"
+    (data / "providers").mkdir(parents=True)
+    (data / "providers" / "x.json").write_text("{}", encoding="utf-8")
+    state.mkdir()
+    (state / "registry.host.json").write_text("{}", encoding="utf-8")
+    result = subprocess.run(
+        ["bash", str(ROOT / "hooks" / "session-start.sh")],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={
+            "HOME": str(tmp_path),
+            "NN_STATE": str(state),
+            "NN_HOME": str(data),
+            "PATH": "/usr/bin:/bin",
+        },
+    )
+    assert result.returncode == 0
+    assert result.stdout == "", result.stdout
+
+
+def test_session_start_hook_speaks_when_nothing_was_scanned(tmp_path):
+    data = tmp_path / "data"
+    (data / "providers").mkdir(parents=True)
+    (data / "providers" / "x.json").write_text("{}", encoding="utf-8")
+    result = subprocess.run(
+        ["bash", str(ROOT / "hooks" / "session-start.sh")],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={
+            "HOME": str(tmp_path),
+            "NN_STATE": str(tmp_path / "empty"),
+            "NN_HOME": str(data),
+            "PATH": "/usr/bin:/bin",
+        },
+    )
+    assert result.returncode == 0
+    assert "nn scan" in result.stdout
+
+
+def test_pre_commit_hook_runs_the_same_checks_as_make_check():
+    text = (ROOT / "hooks" / "pre-commit").read_text(encoding="utf-8")
+    for check in ("ruff check", "ruff format --check", "mypy --strict", "not smoke"):
+        assert check in text, check
+    assert "--no-verify" in text  # выход всегда назван вслух
+
+
+def test_ci_covers_both_platforms_and_a_cold_start():
+    text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    for token in ("ubuntu-latest", "macos-latest", "3.11", "3.13"):
+        assert token in text, token
+    assert "nn init" in text  # холодный старт на пустой машине
+    assert "NN_LANG=ru" in text
+
+
+def test_issue_templates_include_the_data_first_path():
+    templates = ROOT / ".github" / "ISSUE_TEMPLATE"
+    names = {path.name for path in templates.glob("*.yml")}
+    assert {"bug_report.yml", "feature_request.yml", "add_tool.yml", "config.yml"} <= names
+    assert "priors.json" in (templates / "add_tool.yml").read_text(encoding="utf-8")
+
+
+def test_pull_request_template_asks_for_evidence():
+    text = (ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
+    assert "make check" in text
+    assert "NN_LANG=ru" in text
+
+
+def test_makefile_exposes_setup_and_hooks():
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
+    for target in ("help:", "setup:", "check:", "hooks:", "smoke-fast:", "clean:"):
+        assert target in text, target
+
+
+def test_installer_offers_the_hook_without_forcing_it():
+    text = (ROOT / "install.sh").read_text(encoding="utf-8")
+    assert "pre-commit" in text
+    assert "NN_INSTALL_HOOKS" in text  # неинтерактивный путь тоже назван

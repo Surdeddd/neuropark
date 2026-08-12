@@ -114,3 +114,22 @@ def test_patch_is_never_applied_to_original(repo):
         ["git", "log", "--oneline"], cwd=repo, capture_output=True, text=True, check=True
     )
     assert len(log.stdout.strip().splitlines()) == 1  # ни одного нового коммита
+
+
+def test_worktree_ignores_git_env_of_the_calling_process(tmp_path, monkeypatch, repo):
+    """Под git-хуком GIT_DIR указывает на чужой репозиторий — git обязан его игнорировать.
+
+    Именно так первый коммит через собственный pre-commit уронил 13 тестов: git внутри
+    временного репозитория работал с репозиторием nn.
+    """
+    other = tmp_path / "other"
+    other.mkdir()
+    monkeypatch.setenv("GIT_DIR", str(other))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(other / "index"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(other))
+    path = create(repo, "envcheck")
+    (path / "new.txt").write_text("x", encoding="utf-8")
+    result = finish(repo, path, "envcheck")
+    assert result.changed
+    assert result.patch is not None
+    assert "new.txt" in result.patch.read_text(encoding="utf-8")

@@ -209,3 +209,28 @@ def test_burn_run_with_yes_executes_and_clears_queue(env, capsys, tmp_path):
 def test_no_command_prints_help(env, capsys):
     assert main([]) == int(Exit.OK)
     assert "каталог парка нейронок" in capsys.readouterr().out
+
+
+def test_ls_unknown_capability_says_so_instead_of_printing_nothing(env, capsys):
+    """Пустой вывод неотличим от поломки: команда обязана сказать словами."""
+    main(["scan"])
+    capsys.readouterr()
+    assert main(["ls", "nosuchcap"]) == int(Exit.OK)
+    out = capsys.readouterr().out
+    assert out.strip()
+    assert "nosuchcap" in out
+    assert "transcribe" in out  # названы известные capability
+
+
+def test_stats_without_runs_says_the_log_is_empty(env, capsys):
+    main(["scan"])
+    capsys.readouterr()
+    assert main(["stats"]) == int(Exit.OK)
+    assert capsys.readouterr().out.strip()
+
+
+def test_doctor_on_clean_catalog_says_no_problems(env, capsys):
+    main(["scan"])
+    capsys.readouterr()
+    assert main(["doctor"]) == int(Exit.OK)
+    assert capsys.readouterr().out.strip()

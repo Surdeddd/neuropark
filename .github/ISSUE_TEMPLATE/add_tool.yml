@@ -1,0 +1,56 @@
+name: Add a tool / Добавить инструмент
+description: nn should know about another AI tool out of the box / nn должен знать ещё один инструмент из коробки
+labels: [catalog]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        `nn init` detects tools using `priors.json`. Adding a tool there means every user
+        gets it detected automatically — no manual manifest.
+        `nn init` ищет инструменты по `priors.json`. Инструмент, добавленный туда,
+        находится у всех автоматически — без ручного манифеста.
+
+  - type: input
+    id: tool
+    attributes:
+      label: Tool / Инструмент
+      placeholder: whisper.cpp, ollama, some-cli
+    validations:
+      required: true
+
+  - type: input
+    id: install
+    attributes:
+      label: How it gets installed / Как ставится
+      placeholder: brew install whisper-cpp
+    validations:
+      required: true
+
+  - type: textarea
+    id: probe
+    attributes:
+      label: How to prove it is present / Как убедиться, что он есть
+      description: A binary name, a file path, an env var, an http endpoint, a python import, an npm package, a docker image or a brew formula.
+      placeholder: |
+        binary: whisper-cli
+        model files: ~/models/ggml-*.bin
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: A command that actually works / Команда, которая реально работает
+      description: Paste one you have run yourself, with real flags.
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: capability
+    attributes:
+      label: What it does / Что умеет
+      description: "An existing capability id (see `capabilities.json`) or a new one."
+      placeholder: transcribe
+    validations:
+      required: true

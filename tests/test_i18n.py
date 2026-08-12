@@ -149,3 +149,66 @@ def test_every_printed_literal_goes_through_bi():
         collector.visit(ast.parse(path.read_text(encoding="utf-8")))
         offenders.extend(collector.offenders)
     assert offenders == [], offenders
+
+
+# Русский текст, который НЕ является интерфейсом: регулярки, которыми ищется отказ
+# модели в её собственном ответе. Перевод сломал бы сопоставление, а не помог бы.
+MATCHING_DATA = {"DEFAULT_REFUSALS"}
+
+
+class _EveryLiteral(ast.NodeVisitor):
+    """Тот же обход, но литералы ловятся везде, а не только в print/NnError.
+
+    Прошлая версия сторожила лишь вызовы print и NnError, поэтому мимо неё прошли
+    русские строки в конструкторах датаклассов, в аргументах хелперов и в модульных
+    константах: `nn quota`, `nn scan` и все ошибки валидации отвечали по-русски даже
+    при NN_LANG=en. Найдено живым прогоном холодного старта 2026-08-12.
+    """
+
+    def __init__(self, filename: str) -> None:
+        self.filename = filename
+        self.offenders: list[str] = []
+        self._inside_bi = 0
+        self._inside_matching_data = 0
+        self._docstrings: set[int] = set()
+        self._cyrillic = re.compile(r"[а-яА-ЯёЁ]")
+
+    def note_docstrings(self, tree: ast.Module) -> None:
+        holders = (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+        for node in ast.walk(tree):
+            if isinstance(node, holders) and ast.get_docstring(node, clean=False) is not None:
+                body = node.body
+                if body and isinstance(body[0], ast.Expr):
+                    self._docstrings.add(id(body[0].value))
+
+    def visit_Call(self, node: ast.Call) -> None:
+        bi_call = _call_name(node) == "bi"
+        self._inside_bi += int(bi_call)
+        self.generic_visit(node)
+        self._inside_bi -= int(bi_call)
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        names = {target.id for target in node.targets if isinstance(target, ast.Name)}
+        data = bool(names & MATCHING_DATA)
+        self._inside_matching_data += int(data)
+        self.generic_visit(node)
+        self._inside_matching_data -= int(data)
+
+    def visit_Constant(self, node: ast.Constant) -> None:
+        if not isinstance(node.value, str) or id(node) in self._docstrings:
+            return
+        if self._inside_bi or self._inside_matching_data:
+            return
+        if self._cyrillic.search(node.value):
+            self.offenders.append(f"{self.filename}:{node.lineno} {node.value[:40]!r}")
+
+
+def test_no_russian_literal_lives_outside_bi():
+    offenders: list[str] = []
+    for path in sorted(SRC.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        collector = _EveryLiteral(path.name)
+        collector.note_docstrings(tree)
+        collector.visit(tree)
+        offenders.extend(collector.offenders)
+    assert offenders == [], offenders

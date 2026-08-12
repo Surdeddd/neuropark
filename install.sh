@@ -35,12 +35,31 @@ else
 fi
 
 case ":${PATH}:" in
-  *":${root}/bin:"*) say "3/4  bin already in PATH" ;;
-  *) say "3/4  add to your shell profile:  export PATH=\"${root}/bin:\$PATH\"" ;;
+  *":${root}/bin:"*) say "3/5  bin already in PATH" ;;
+  *) say "3/5  add to your shell profile:  export PATH=\"${root}/bin:\$PATH\"" ;;
 esac
 
+# The git hook is offered, never forced: it belongs to whoever commits here.
+# Гит-хук предлагается, а не навязывается: он принадлежит тому, кто тут коммитит.
+if [ -d "${root}/.git" ] && [ ! -e "${root}/.git/hooks/pre-commit" ]; then
+  if [ "${NN_INSTALL_HOOKS:-}" = "1" ]; then
+    reply=y
+  elif [ -t 0 ]; then
+    printf '4/5  install the git pre-commit hook (lint, types, tests)? [y/N] '
+    read -r reply || reply=n
+  else
+    reply=n
+  fi
+  case "${reply}" in
+    y | Y) ln -sf ../../hooks/pre-commit "${root}/.git/hooks/pre-commit" && say "     hook installed → hooks/pre-commit  (skip once: git commit --no-verify)" ;;
+    *) say "     skipped — install later with:  make hooks" ;;
+  esac
+else
+  say "4/5  git pre-commit hook: nothing to do"
+fi
+
 say
-say "4/4  detecting your tools / ищу твои инструменты"
+say "5/5  detecting your tools / ищу твои инструменты"
 say
 "${root}/bin/nn" init
 say

@@ -12,8 +12,10 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from nn.i18n import bi
 from nn.paths import data_dir, state_dir
 from nn.runlog import RunRecord, read_all
+from nn.schema import bilingual
 
 MAX_LINES = 40
 AUTO_LEARN_AFTER = 20
@@ -73,7 +75,7 @@ def signature(stderr_tail: str) -> str:
     """
     lines = [line.strip() for line in stderr_tail.splitlines() if line.strip()]
     last = lines[-1] if lines else ""
-    without_paths = _PATHS.sub("<путь>", last)
+    without_paths = _PATHS.sub("<path>", last)
     return _NUMBERS.sub("N", without_paths).lower()[:120]
 
 
@@ -86,7 +88,7 @@ def load_rules(root: Path | None = None) -> list[tuple[str, str]]:
     except json.JSONDecodeError:
         return []
     return [
-        (str(rule["match"]).lower(), str(rule["instruction"]))
+        (str(rule["match"]).lower(), bilingual(rule["instruction"], path.name, "instruction"))
         for rule in payload.get("rules", [])
         if rule.get("match") and rule.get("instruction")
     ]
@@ -122,9 +124,13 @@ def distill(records: list[RunRecord], rules: list[tuple[str, str]]) -> list[Less
                 lessons.append(
                     Lesson(
                         provider,
-                        f"{capability}: пустой ответ {count} раза подряд",
-                        "инлайн-промпт этому провайдеру не годится, подавай его через"
-                        " {prompt_file} и проверяй, что вход не пустой",
+                        f"{capability}: {bi('empty reply', 'пустой ответ')} × {count}",
+                        bi(
+                            "an inline prompt does not work for this provider: pass it"
+                            " through {prompt_file} and check the input is not empty",
+                            "инлайн-промпт этому провайдеру не годится, подавай его через"
+                            " {prompt_file} и проверяй, что вход не пустой",
+                        ),
                     )
                 )
 
@@ -134,8 +140,11 @@ def distill(records: list[RunRecord], rules: list[tuple[str, str]]) -> list[Less
             lessons.append(
                 Lesson(
                     provider,
-                    f"таймаут {timeouts} раза",
-                    f"поднять timeout_s минимум до {target}",
+                    f"{bi('timeout', 'таймаут')} × {timeouts}",
+                    bi(
+                        f"raise timeout_s to at least {target}",
+                        f"поднять timeout_s минимум до {target}",
+                    ),
                 )
             )
 
@@ -144,7 +153,11 @@ def distill(records: list[RunRecord], rules: list[tuple[str, str]]) -> list[Less
                 continue
             advice = next((text for needle, text in rules if needle in sign), None)
             lessons.append(
-                Lesson(provider, f"«{sign}» × {count}, последний раз {last_seen[sign]}", advice)
+                Lesson(
+                    provider,
+                    f"«{sign}» × {count}, {bi('last seen', 'последний раз')} {last_seen[sign]}",
+                    advice,
+                )
             )
 
     return lessons

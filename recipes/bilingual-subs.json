@@ -1,6 +1,9 @@
 {
   "id": "bilingual-subs",
-  "description": "видео → транскрипт → перевод на русский → сабы, вжжённые в картинку",
+  "description": {
+    "en": "video → transcript → translation into Russian → subtitles burned into the picture",
+    "ru": "видео → транскрипт → перевод на русский → сабы, вжжённые в картинку"
+  },
   "steps": [
     { "capability": "transcribe" },
     { "capability": "translate", "vars": { "lang": "ru" } },

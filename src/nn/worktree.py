@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from nn.errors import Exit, NnError
+from nn.gitenv import clean_env
 from nn.i18n import bi
 from nn.paths import state_dir
 
@@ -32,6 +33,7 @@ def _git(args: list[str], *, cwd: Path) -> tuple[int, str, str]:
         text=True,
         check=False,
         timeout=120,
+        env=clean_env(),
     )
     return done.returncode, done.stdout, done.stderr
 

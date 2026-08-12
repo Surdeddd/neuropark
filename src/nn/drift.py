@@ -8,15 +8,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from nn.i18n import bi
 from nn.registry import Registry
 
-TITLES = {
-    "appeared": "появилось",
-    "disappeared": "исчезло",
-    "status": "сменился статус",
-    "version": "обновилась версия",
-}
 ORDER = ("appeared", "disappeared", "status", "version")
+
+
+def title(kind: str) -> str:
+    return {
+        "appeared": bi("appeared", "появилось"),
+        "disappeared": bi("disappeared", "исчезло"),
+        "status": bi("status changed", "сменился статус"),
+        "version": bi("version changed", "обновилась версия"),
+    }[kind]
 
 
 @dataclass(frozen=True)
@@ -34,7 +38,8 @@ def compare(old: Registry | None, new: Registry) -> list[DriftItem]:
     for pid, entry in sorted(new.entries.items()):
         was = old.entries.get(pid)
         if was is None:
-            items.append(DriftItem("appeared", pid, f"новая нейронка, статус {entry.status}"))
+            appeared = bi("new tool, status", "новая нейронка, статус")
+            items.append(DriftItem("appeared", pid, f"{appeared} {entry.status}"))
             continue
         if was.status != entry.status:
             detail = f"{was.status} → {entry.status}"
@@ -44,7 +49,8 @@ def compare(old: Registry | None, new: Registry) -> list[DriftItem]:
         elif was.version != entry.version and entry.version:
             items.append(DriftItem("version", pid, f"{was.version or '?'} → {entry.version}"))
     for pid in sorted(set(old.entries) - set(new.entries)):
-        items.append(DriftItem("disappeared", pid, "манифест исчез из каталога"))
+        gone = bi("manifest is gone from the catalog", "манифест исчез из каталога")
+        items.append(DriftItem("disappeared", pid, gone))
     return items
 
 
@@ -56,6 +62,6 @@ def format_drift(items: list[DriftItem]) -> str:
         group = [item for item in items if item.kind == kind]
         if not group:
             continue
-        lines.append(f"{TITLES[kind]}:")
+        lines.append(f"{title(kind)}:")
         lines.extend(f"  {item.provider} — {item.detail}" for item in group)
     return "\n".join(lines)

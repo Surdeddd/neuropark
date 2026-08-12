@@ -35,7 +35,7 @@ from nn.run import execute, exit_code_for
 from nn.runlog import last_success_map, read_all
 from nn.scan import scan
 
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -232,7 +232,25 @@ def _cmd_ls(capability: str | None, as_json: bool) -> int:
             )
         )
     else:
-        print(table(ls_rows(catalog, registry, capability=capability), LS_HEADERS))
+        rows = ls_rows(catalog, registry, capability=capability)
+        if not rows:
+            known = ", ".join(sorted(catalog.capabilities)) or bi("none", "ни одной")
+            if capability is not None and capability not in catalog.capabilities:
+                print(
+                    bi(
+                        f"no such capability: {capability}. Known: {known}",
+                        f"нет такой capability: {capability}. Известны: {known}",
+                    )
+                )
+            else:
+                print(
+                    bi(
+                        "the park is empty for this query — check nn scan",
+                        "по этому запросу парк пуст — проверь nn scan",
+                    )
+                )
+            return int(Exit.OK)
+        print(table(rows, LS_HEADERS))
     return int(Exit.OK)
 
 
@@ -289,7 +307,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
                 bi(f"input file {source} not found", f"входной файл {source} не найден"),
             )
         in_type = type_of(str(source), catalog.types)
-    _require_files(tuple(args.extra), what="дополнительный вход")
+    _require_files(tuple(args.extra), what=bi("extra input", "дополнительный вход"))
     cap = catalog.capabilities.get(args.capability)
     if cap is not None:
         check_extra(cap, tuple(args.extra), catalog.types)
@@ -508,9 +526,11 @@ def _cmd_quota(as_json: bool) -> int:
     rows = [
         [
             pid,
-            f"{w.window_h:g}ч",
+            f"{w.window_h:g}{bi('h', 'ч')}",
             f"{w.calls}/{w.soft_cap}" if w.soft_cap else str(w.calls),
-            "исчерпано" if w.is_exhausted(now=now) else ("простаивает" if w.idle else "живое"),
+            bi("exhausted", "исчерпано")
+            if w.is_exhausted(now=now)
+            else (bi("idle", "простаивает") if w.idle else bi("live", "живое")),
             w.resets_at.strftime("%H:%M") if w.resets_at else "-",
         ]
         for pid, w in sorted(windows.items())
@@ -614,7 +634,7 @@ def _cmd_recipe(args: argparse.Namespace) -> int:
     registry = _load_registry()
     recipe = catalog.recipes.get(args.recipe_id)
     if recipe is None:
-        known = ", ".join(sorted(catalog.recipes)) or "ни одного"
+        known = ", ".join(sorted(catalog.recipes)) or bi("none", "ни одного")
         raise NnError(
             Exit.BAD_DATA,
             bi(
@@ -659,18 +679,28 @@ def _cmd_doctor(as_json: bool) -> int:
     findings = check(catalog, registry)
     if as_json:
         print(json.dumps([asdict(f) for f in findings], ensure_ascii=False, indent=2))
-    else:
+    elif findings:
         rows = [[f.severity, f.subject, f.message] for f in findings]
         print(table(rows, DOCTOR_HEADERS))
+    else:
+        print(bi("no problems found", "проблем не найдено"))
     return int(Exit.BAD_DATA) if any(f.severity == "error" for f in findings) else int(Exit.OK)
 
 
 def _cmd_stats(as_json: bool) -> int:
     runs = read_all()
+    rows = stats_rows(runs)
     if as_json:
-        print(json.dumps(stats_rows(runs), ensure_ascii=False))
+        print(json.dumps(rows, ensure_ascii=False))
+    elif rows:
+        print(table(rows, STATS_HEADERS))
     else:
-        print(table(stats_rows(runs), STATS_HEADERS))
+        print(
+            bi(
+                "nothing has been called through nn yet — the run log is empty",
+                "через nn пока ничего не звали — журнал запусков пустой",
+            )
+        )
     return int(Exit.OK)
 
 

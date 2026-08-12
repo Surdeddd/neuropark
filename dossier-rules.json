@@ -1,25 +1,43 @@
 {
-  "_comment": "Известные подписи ошибок → готовая инструкция в досье провайдера. Пополняется руками по мере накопления грабель; всё остальное движок фиксирует как наблюдение без совета.",
+  "_comment": {
+    "en": "Known error signatures → a ready instruction for the provider's dossier. Filled by hand as gotchas pile up; everything else is recorded as an observation with no advice attached.",
+    "ru": "Известные подписи ошибок → готовая инструкция в досье провайдера. Пополняется руками по мере накопления грабель; всё остальное движок фиксирует как наблюдение без совета."
+  },
   "rules": [
     {
       "match": "modulenotfounderror: no module named",
-      "instruction": "у провайдера свой интерпретатор: проверь vars.py в манифесте, системный python не годится"
+      "instruction": {
+        "en": "this provider needs its own interpreter: check vars.py in the manifest, the system python will not do",
+        "ru": "у провайдера свой интерпретатор: проверь vars.py в манифесте, системный python не годится"
+      }
     },
     {
       "match": "nothing was written into output file",
-      "instruction": "ffmpeg не смог записать контейнер: скорее всего расширение выхода не то, что провайдер умеет — задай io.out_ext"
+      "instruction": {
+        "en": "ffmpeg could not write the container: most likely the output extension is not one this provider produces — set io.out_ext",
+        "ru": "ffmpeg не смог записать контейнер: скорее всего расширение выхода не то, что провайдер умеет — задай io.out_ext"
+      }
     },
     {
       "match": "ни один дубль не прошёл",
-      "instruction": "внутренняя сверка отбраковала все дубли: дай текст длиннее одной фразы либо подними число дублей"
+      "instruction": {
+        "en": "the tool's internal check rejected every take: give it text longer than one phrase, or raise the number of takes",
+        "ru": "внутренняя сверка отбраковала все дубли: дай текст длиннее одной фразы либо подними число дублей"
+      }
     },
     {
       "match": "connection refused",
-      "instruction": "хост не поднят: проверь probe в файле хоста и не спит ли машина"
+      "instruction": {
+        "en": "the host is not up: check probe in the host file, and whether the machine is asleep",
+        "ru": "хост не поднят: проверь probe в файле хоста и не спит ли машина"
+      }
     },
     {
       "match": "no such file or directory",
-      "instruction": "путь в шаблоне или vars уехал: прогони nn doctor, он сверяет пути моделей"
+      "instruction": {
+        "en": "a path in a template or in vars has moved: run nn doctor, it verifies model paths",
+        "ru": "путь в шаблоне или vars уехал: прогони nn doctor, он сверяет пути моделей"
+      }
     }
   ]
 }

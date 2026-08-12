@@ -1,0 +1,50 @@
+name: Bug report / Баг
+description: Something in nn behaves wrong / nn ведёт себя не так
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write in English or Russian — both are fine.
+        Пиши по-английски или по-русски — оба варианта нормальные.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened / Что произошло
+      placeholder: |
+        nn run transcribe talk.mp4 → exit 5, but the registry was scanned an hour ago
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected / Что ожидалось
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `nn doctor` / Вывод `nn doctor`
+      description: This is the fastest way to see the state of your park. Redact paths you consider private.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: nn version / Версия nn
+      description: "`nn --version`"
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: OS and python / ОС и python
+      placeholder: macOS 15.5, python 3.12.4
+    validations:
+      required: true

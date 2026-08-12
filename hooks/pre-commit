@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Pre-commit hook: lint, types and unit tests before anything enters history.
+# Хук pre-commit: линтер, типы и юниты до того, как что-то попадёт в историю.
+#
+# Install with:  make hooks        (or ./install.sh, which offers it)
+# Skip once with: git commit --no-verify
+set -uo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root" || exit 1
+
+# git отдаёт хуку GIT_DIR/GIT_INDEX_FILE и родню. Всё, что запускается дальше,
+# унаследовало бы их и работало не с тем репозиторием — тесты worktree ловят это сразу.
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_OBJECT_DIRECTORY \
+  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX GIT_COMMON_DIR GIT_INDEX_VERSION
+
+fail() {
+  printf '\npre-commit: %s\n' "$1" >&2
+  printf 'fix it, or commit with --no-verify if you know what you are doing\n' >&2
+  exit 1
+}
+
+if ! command -v ruff >/dev/null 2>&1; then
+  printf 'pre-commit: ruff is not installed, skipping checks\n' >&2
+  exit 0
+fi
+
+ruff check . >/dev/null || fail "ruff check failed — run: ruff check ."
+ruff format --check src tests >/dev/null || fail "formatting differs — run: ruff format src tests"
+
+if command -v mypy >/dev/null 2>&1; then
+  mypy --strict src >/dev/null || fail "mypy --strict failed — run: mypy --strict src"
+fi
+
+# Unit tests only: no network, no subscriptions, ~6 seconds.
+# Живые смоуки сюда не берём: они трогают железо и тратят минуты.
+if command -v uv >/dev/null 2>&1; then
+  uv run --with pytest --python 3.12 pytest -m "not smoke" -q >/dev/null \
+    || fail "unit tests failed — run: make test"
+elif python3 -c "import pytest" >/dev/null 2>&1; then
+  python3 -m pytest -m "not smoke" -q >/dev/null || fail "unit tests failed — run: make test"
+fi
+
+exit 0

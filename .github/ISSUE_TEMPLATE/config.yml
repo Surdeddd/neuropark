@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question / Вопрос
+    url: https://github.com/Surdeddd/neuropark/discussions
+    about: Ask how something works before filing a bug / Спроси, как что-то работает, до того как заводить баг

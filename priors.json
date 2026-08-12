@@ -1,5 +1,8 @@
 {
-  "_comment": "Known tools nn can wire up automatically. `nn init` probes each one and writes a manifest for whatever is present. Paths use globs so no machine-specific path is hardcoded. / Известные инструменты, которые nn подключает сам. `nn init` проверяет каждый и пишет манифест для найденного.",
+  "_comment": {
+    "en": "Known tools nn can wire up automatically. `nn init` probes each one and writes a manifest for whatever is present. Paths use globs so no machine-specific path is hardcoded.",
+    "ru": "Известные инструменты, которые nn подключает сам. `nn init` проверяет каждый и пишет манифест для найденного. Пути заданы шаблонами, поэтому ни один путь не привязан к конкретной машине."
+  },
   "priors": [
     {
       "id": "whisper-cpp",
@@ -179,8 +182,8 @@
       "quota_patterns": ["quota", "rate limit", "resource exhausted"],
       "roles": ["review"],
       "notes": {
-        "en": "Gemini CLI",
-        "ru": "Gemini CLI"
+        "en": "Google Gemini CLI. Long context; the window it gives you depends on the tier and resets opaquely, so quota_patterns are what actually catch an exhausted window",
+        "ru": "Google Gemini CLI. Длинный контекст; выделенное окно зависит от тарифа и сбрасывается непрозрачно, поэтому исчерпание ловится именно quota_patterns"
       }
     },
     {

@@ -12,5 +12,8 @@
   "env": {
     "SOME_API_KEY": "@file:~/.config/secrets/some.key"
   },
-  "notes": "A machine reached over ssh. auto=false means nn prints the command instead of running it — flip to true only when you are ready for remote execution. Secrets go in only as @file: references, read at run time, never committed. / Машина по ssh. auto=false значит nn печатает команду, а не запускает — переключай в true, когда готов к удалённому исполнению. Секреты только ссылкой @file:, читаются в момент запуска и в git не попадают."
+  "notes": {
+    "en": "A machine reached over ssh. auto=false means nn prints the command instead of running it — flip to true only when you are ready for remote execution. Secrets go in only as @file: references, read at run time, never committed.",
+    "ru": "Машина по ssh. auto=false значит nn печатает команду, а не запускает — переключай в true, когда готов к удалённому исполнению. Секреты только ссылкой @file:, читаются в момент запуска и в git не попадают."
+  }
 }

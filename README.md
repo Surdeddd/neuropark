@@ -4,9 +4,9 @@
 
 **One catalog for every AI tool you own. One command to call any of them.**
 
+[![ci](https://github.com/Surdeddd/neuropark/actions/workflows/ci.yml/badge.svg)](https://github.com/Surdeddd/neuropark/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![deps](https://img.shields.io/badge/runtime%20deps-zero-brightgreen)](#why-it-stays-alive)
-[![tests](https://img.shields.io/badge/tests-326-brightgreen)](#development)
 [![typed](https://img.shields.io/badge/mypy-strict-blue)](#development)
 [![license](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 [![lang](https://img.shields.io/badge/UI-EN%20%2F%20RU-orange)](#language)
@@ -54,6 +54,43 @@ written manifests: 10
 
 Nothing to configure by hand to get started. Runtime needs **python 3.11+ and nothing else** — no pip install, no dependencies.
 
+<details>
+<summary><b>What the installer does, and how to skip parts of it</b></summary>
+
+| step | what happens | how to opt out |
+|---|---|---|
+| 1 | checks python 3.11+, makes `bin/nn` executable | — |
+| 2 | links `skills/nn` into `~/.claude/skills/nn` so Claude Code can reach it | remove the symlink |
+| 3 | tells you the `PATH` line to add — never edits your shell profile | — |
+| 4 | offers the git pre-commit hook (lint, types, tests) | answer `N`; add later with `make hooks` |
+| 5 | `nn init` + `nn scan` — detects your tools and writes the registry | — |
+
+Non-interactive install: `NN_INSTALL_HOOKS=1 ./install.sh` takes the hook without asking,
+and without a TTY the hook is simply skipped. Re-running the installer is safe: an existing
+symlink and an existing hook are left alone.
+
+```bash
+export NN_HOME=~/my-park       # where your manifests live (default ~/.claude/nn/data)
+export NN_STATE=~/my-park-state  # registry, run log, dossiers (default ~/.claude/nn)
+export NN_LANG=ru              # interface language
+```
+
+</details>
+
+<details>
+<summary><b>As a Claude Code plugin</b></summary>
+
+```
+/plugin marketplace add Surdeddd/neuropark
+/plugin install neuropark
+```
+
+You get the `nn` skill, the `/nn` command, and a `SessionStart` hook that stays silent
+unless the park needs attention — no catalog yet, never scanned, or a registry old enough
+that `nn` refuses to use it. Then it prints one line naming the command that fixes it.
+
+</details>
+
 ## How it works
 
 ```
@@ -87,7 +124,7 @@ Three layers, and only the middle one is code:
 | layer | what lives there | who edits it |
 |---|---|---|
 | **data** | `providers/` `hosts/` `bridges/` `recipes/` `roles.json` `capabilities.json` | you, with a text editor |
-| **engine** | resolve · bridge · transport · quota · dossier · orchestrate | 33 modules, stdlib only |
+| **engine** | resolve · bridge · transport · quota · dossier · orchestrate | 34 modules, stdlib only |
 | **state** | registry, run log, quota windows, dossiers, patches | written by `nn`, never by hand |
 
 The engine holds **no list** of tools, machines or capabilities. All of that is data — which is why adding a tool costs one file, not a pull request.
@@ -237,7 +274,7 @@ Made for scripts and agents, not just for humans:
 | `5` | no registry, or older than 30 days → run `nn scan` |
 | `6` | quota window exhausted |
 | `7` | invalid manifest, template or recipe |
-| `8` | input type unsupported and no bridge, or a required `--extra` is missing |
+| `8` | input problem: file missing, unsupported type with no bridge, or a required `--extra` absent |
 
 Outcome classes in every envelope: `success` `empty` `timeout` `quota` `refused` `crash`. An empty file or a reply like *"Ready to work. What's the task?"* is classified `empty`, not success.
 
@@ -267,12 +304,20 @@ disappeared:
 ## Development
 
 ```bash
-make check        # ruff + mypy --strict + 326 unit tests, no network, ~10s
+make help         # every target
+make check        # ruff + ruff format + mypy --strict + 347 unit tests, no network, ~10s
 make smoke-fast   # live offline runs: scan, transcript, bridge, doctor (~30s)
 make smoke        # plus TTS with a cold model start (up to 15 min)
+make hooks        # git pre-commit hook: the same checks before anything enters history
 ```
 
+CI runs `make check` on ubuntu and macOS across python 3.11, 3.12 and 3.13, then does a
+**cold start on a bare machine** — `init` → `scan` → `ls` → `doctor` against an empty
+`NN_HOME`, where almost no tool exists — and checks that both languages answer.
+
 Rules that hold: stdlib only at runtime · no `type: ignore` anywhere in `src` · tests never touch the network or spend a subscription · all human-facing text bilingual via `nn.i18n.bi`.
+
+Adding a tool needs no code from you — see [CONTRIBUTING.md](CONTRIBUTING.md). Release notes: [CHANGELOG.md](CHANGELOG.md).
 
 Not implemented, and saying so instead of failing silently: `ssh`/`http` transports (remote hosts print the command), `adapter` providers for tools needing a queue, recipes with multiple inputs.
 

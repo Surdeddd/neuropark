@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from nn.catalog import Catalog
+from nn.i18n import bi
 from nn.paths import user_data_dir
 from nn.registry import Registry
 
@@ -21,10 +22,15 @@ PATTERNS = {
     "default": ("spec", "work", "cross-review", "verdict"),
     "quick": ("work", "verdict"),
 }
-COMMENT = (
-    "Собрано nn adapt детерминированно из результатов скана. Правь руками:"
-    " порядок в providers — это цепочка фолбэков роли."
-)
+
+
+def comment() -> str:
+    return bi(
+        "Assembled by nn adapt, deterministically, from the scan. Edit by hand:"
+        " the order inside providers is the role's fallback chain.",
+        "Собрано nn adapt детерминированно из результатов скана. Правь руками:"
+        " порядок в providers — это цепочка фолбэков роли.",
+    )
 
 
 @dataclass(frozen=True)
@@ -40,7 +46,7 @@ class AdaptResult:
 
     def to_payload(self) -> dict[str, object]:
         return {
-            "_comment": COMMENT,
+            "_comment": comment(),
             "roles": {
                 name: {"providers": list(plan.providers), "worktree": plan.worktree}
                 for name, plan in self.roles.items()

@@ -1,0 +1,31 @@
+name: Feature request / Предложение
+description: nn should be able to do something it cannot / nn должен уметь то, чего пока не умеет
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If you want nn to detect one more tool, use the "Add a tool" template instead —
+        that path needs no new code.
+        Если нужно, чтобы nn находил ещё один инструмент, возьми шаблон «Добавить инструмент» —
+        там код не требуется.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The situation / Ситуация
+      description: What are you trying to do, and where does nn stop you?
+    validations:
+      required: true
+
+  - type: textarea
+    id: shape
+    attributes:
+      label: How it could look / Как это могло бы выглядеть
+      description: A command line, an output, a manifest field — anything concrete.
+      render: shell
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What you do today instead / Что делаешь сейчас вместо этого

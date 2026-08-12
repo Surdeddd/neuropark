@@ -30,22 +30,37 @@ def _templates(raw: Any, source: str, field: str) -> dict[str, str]:
     if isinstance(raw, dict):
         unknown = set(raw) - OS_KEYS
         if unknown:
-            raise _bad(source, f"{field} (неизвестные ОС: {sorted(unknown)})")
+            raise _bad(
+                source, f"{field} ({bi('unknown OS keys', 'неизвестные ОС')}: {sorted(unknown)})"
+            )
         return {str(k): str(v) for k, v in raw.items()}
     raise _bad(source, field)
 
 
-def _notes(raw: Any, source: str) -> str:
-    """Заметки провайдера. Двуязычная форма {"en": ..., "ru": ...} — предпочтительная."""
+def bilingual(raw: Any, source: str, field: str) -> str:
+    """Текст для человека из файла данных: либо {"en": ..., "ru": ...}, либо одна строка.
+
+    Одна строка допустима только для языконезависимого текста. Склейка двух языков
+    в один литерал — это тот же баг, что и в коде: переключение языка её не берёт.
+    """
     if isinstance(raw, dict):
         english = str(raw.get("en") or "")
         russian = str(raw.get("ru") or "")
         if not english or not russian:
-            raise _bad(source, "notes (в двуязычной форме нужны оба ключа: en и ru)")
+            label = bi(
+                "the bilingual form needs both keys: en and ru",
+                "в двуязычной форме нужны оба ключа: en и ru",
+            )
+            raise _bad(source, f"{field} ({label})")
         return bi(english, russian)
-    text = str(raw or "")
+    return str(raw or "")
+
+
+def _notes(raw: Any, source: str) -> str:
+    text = bilingual(raw, source, "notes")
     if not text:
-        raise _bad(source, "notes (обязательны: скорость, качество, грабли)")
+        label = bi("required: speed, quality, gotchas", "обязательны: скорость, качество, грабли")
+        raise _bad(source, f"notes ({label})")
     return text
 
 
@@ -57,10 +72,16 @@ def parse_provider(raw: dict[str, Any], source: str) -> Provider:
         raise _bad(source, "capability")
     kind = str(raw.get("kind") or "")
     if kind not in KINDS:
-        raise _bad(source, f"kind (ожидалось одно из {sorted(KINDS)})")
+        raise _bad(source, f"kind ({bi('expected one of', 'ожидалось одно из')} {sorted(KINDS)})")
     detect = raw.get("detect")
     if not isinstance(detect, dict) or not detect:
-        raise _bad(source, "detect (обязателен и не может быть пустым)")
+        raise _bad(
+            source,
+            bi(
+                "detect (required, and it cannot be empty)",
+                "detect (обязателен и не может быть пустым)",
+            ),
+        )
     io = raw.get("io")
     if not isinstance(io, dict):
         raise _bad(source, "io")
@@ -72,9 +93,13 @@ def parse_provider(raw: dict[str, Any], source: str) -> Provider:
     run = _templates(raw.get("run"), source, "run")
     adapter = raw.get("adapter")
     if run and adapter:
-        raise _bad(source, "adapter (взаимоисключающ с run)")
+        raise _bad(
+            source, bi("adapter (mutually exclusive with run)", "adapter (взаимоисключающ с run)")
+        )
     if not run and not adapter:
-        raise _bad(source, "run (обязателен, если нет adapter)")
+        raise _bad(
+            source, bi("run (required unless adapter is set)", "run (обязателен, если нет adapter)")
+        )
     notes = _notes(raw.get("notes"), source)
     return Provider(
         id=pid,
@@ -110,9 +135,11 @@ def parse_host(raw: dict[str, Any], source: str) -> Host:
         raise _bad(source, "id")
     kind = str(raw.get("kind") or "")
     if kind not in HOST_KINDS:
-        raise _bad(source, f"kind (ожидалось одно из {sorted(HOST_KINDS)})")
+        raise _bad(
+            source, f"kind ({bi('expected one of', 'ожидалось одно из')} {sorted(HOST_KINDS)})"
+        )
     if kind == "ssh" and not raw.get("addr"):
-        raise _bad(source, "addr (обязателен для kind=ssh)")
+        raise _bad(source, bi("addr (required for kind=ssh)", "addr (обязателен для kind=ssh)"))
     return Host(
         id=hid,
         kind=kind,
@@ -122,7 +149,7 @@ def parse_host(raw: dict[str, Any], source: str) -> Host:
         probe=raw.get("probe"),
         paths={str(k): str(v) for k, v in (raw.get("paths") or {}).items()},
         env={str(k): str(v) for k, v in (raw.get("env") or {}).items()},
-        notes=str(raw.get("notes") or ""),
+        notes=bilingual(raw.get("notes"), source, "notes"),
     )
 
 
@@ -181,7 +208,8 @@ def parse_roles(raw: dict[str, Any], source: str = "roles.json") -> RolesConfig:
         listed = tuple(str(s) for s in stages)
         unknown = set(listed) - STAGES
         if unknown:
-            raise _bad(source, f"patterns.{name} (неизвестные стадии: {sorted(unknown)})")
+            label = bi("unknown stages", "неизвестные стадии")
+            raise _bad(source, f"patterns.{name} ({label}: {sorted(unknown)})")
         patterns[str(name)] = listed
     return RolesConfig(roles=roles, patterns=patterns)
 
@@ -196,7 +224,8 @@ def parse_recipe(raw: dict[str, Any], source: str) -> Recipe:
     steps: list[Step] = []
     for index, body in enumerate(steps_raw):
         if bool(body.get("capability")) == bool(body.get("role")):
-            raise _bad(source, f"steps[{index}] (нужен ровно один из capability/role)")
+            label = bi("exactly one of capability/role", "нужен ровно один из capability/role")
+            raise _bad(source, f"steps[{index}] ({label})")
         steps.append(
             Step(
                 capability=body.get("capability"),
@@ -212,7 +241,7 @@ def parse_recipe(raw: dict[str, Any], source: str) -> Recipe:
         raise _bad(source, "on_quota")
     return Recipe(
         id=rid,
-        description=str(raw.get("description") or ""),
+        description=bilingual(raw.get("description"), source, "description"),
         steps=tuple(steps),
         on_quota=on_quota,
     )

@@ -167,7 +167,7 @@ def orchestrate(
         )
     stages = catalog.roles.patterns.get(pattern, DEFAULT_PATTERN if pattern == "default" else ())
     if not stages:
-        known = ", ".join(sorted(catalog.roles.patterns)) or "только default"
+        known = ", ".join(sorted(catalog.roles.patterns)) or bi("default only", "только default")
         raise NnError(
             Exit.BAD_DATA,
             bi(
