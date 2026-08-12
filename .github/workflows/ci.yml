@@ -125,6 +125,9 @@ jobs:
             echo "StrictModes no"
             echo "UsePAM no"
             echo "PasswordAuthentication no"
+            echo "PubkeyAuthentication yes"
+            echo "KbdInteractiveAuthentication no"
+            echo "LogLevel DEBUG2"
             echo "PidFile $dir/sshd.pid"
           } > "$dir/sshd_config"
           # Без /run/sshd приватное разделение не поднимается и sshd молча уходит с 255.
@@ -138,8 +141,16 @@ jobs:
           done
           nc -z 127.0.0.1 2222 || { echo "port never opened:"; sudo cat "$dir/sshd.log"; exit 1; }
           ssh-keyscan -p 2222 -t ed25519 127.0.0.1 > "$dir/known_hosts" 2>/dev/null
+          # Диагностика тут не роскошь: отказ в ключе на чужой машине иначе выглядит
+          # как «просто не работает», а причина лежит в логе sshd.
           ssh -p 2222 -i "$dir/clientkey" -o BatchMode=yes -o IdentitiesOnly=yes \
-            -o UserKnownHostsFile="$dir/known_hosts" 127.0.0.1 true
+            -o UserKnownHostsFile="$dir/known_hosts" 127.0.0.1 true \
+            || { echo "--- sshd log ---"; sudo cat "$dir/sshd.log";
+                 echo "--- perms ---"; ls -la "$dir"; namei -l "$dir/authorized_keys";
+                 echo "--- ssh -vvv ---";
+                 ssh -vvv -p 2222 -i "$dir/clientkey" -o BatchMode=yes -o IdentitiesOnly=yes \
+                   -o UserKnownHostsFile="$dir/known_hosts" 127.0.0.1 true 2>&1 | tail -40;
+                 exit 1; }
 
       - name: Live ssh smokes
         env:
