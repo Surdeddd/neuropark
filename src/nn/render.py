@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from nn.errors import Exit, NnError
+from nn.i18n import bi
 from nn.model import Host, Provider
 from nn.paths import expand
 
@@ -62,7 +63,10 @@ def render(template: str, context: Mapping[str, str]) -> str:
         if name not in context:
             raise NnError(
                 Exit.BAD_DATA,
-                f"шаблон ссылается на неизвестную переменную {{{name}}}",
+                bi(
+                    f"template refers to an unknown variable {{{name}}}",
+                    f"шаблон ссылается на неизвестную переменную {{{name}}}",
+                ),
             )
         return context[name]
 

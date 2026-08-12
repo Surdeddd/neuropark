@@ -56,15 +56,23 @@ class DetectResult:
     reason: str
 
 
-def _glob_matches(pattern: str) -> bool:
-    """Есть ли хоть одно совпадение по абсолютному шаблону.
+def glob_paths(pattern: str) -> list[Path]:
+    """Единственное место в проекте, где раскрывается файловый шаблон.
 
-    Намеренно используется glob.glob, а не Path.glob (ruff PTH207): на macOS
+    Намеренно glob.glob, а не Path.glob (ruff PTH207): на macOS
     Path("/").glob("var/...") не проходит промежуточный симлинк /var → private/var,
     поэтому даёт пустой результат и тратит на это ~20 секунд. glob.glob отвечает
     правильно за 0.01s. Проверено на python 3.12 и 3.14, 2026-08-12.
+
+    Функция общая именно поэтому: ту же граблю я один раз уже вылечил здесь,
+    а потом переизобрёл в nn.init. Один вход — один предохранитель.
     """
-    return bool(globlib.glob(str(Path(pattern).expanduser())))  # noqa: PTH207
+    expanded = str(Path(pattern).expanduser())
+    return [Path(found) for found in globlib.glob(expanded)]  # noqa: PTH207
+
+
+def _glob_matches(pattern: str) -> bool:
+    return bool(glob_paths(pattern))
 
 
 def run_detect(

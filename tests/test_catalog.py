@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -69,3 +70,13 @@ def test_load_catalog_reads_repo_data():
     assert "transcribe" in cat.capabilities
     assert cat.capabilities["translate"].out == "same"
     assert cat.capabilities["subtitle-burn"].extra == ("srt",)
+
+
+def test_tests_never_see_the_personal_layer():
+    """Регрессия: load_catalog() без изоляции подмешивал личные манифесты пользователя,
+    и набор тестов начинал зависеть от того, что у человека установлено."""
+    cat = load_catalog()
+    bundled = {
+        path.stem for path in (Path(__file__).resolve().parents[1] / "providers").glob("*.json")
+    }
+    assert set(cat.providers) <= bundled, set(cat.providers) - bundled

@@ -90,10 +90,62 @@ def test_russian_half_actually_has_cyrillic():
 
 
 def test_no_slash_joined_bilingual_strings_left():
-    """Анти-паттерн: 'english / русский' в одном литерале вместо переключения языка."""
+    """Анти-паттерн: 'english / русский' вместо переключения языка.
+
+    Ловится и однострочный литерал, и склейка из соседних строк — второй вариант
+    сторож однажды пропустил, и склейка дожила до вывода nn adapt.
+    """
     bad: list[str] = []
+    single = re.compile(r'"[^"]*[a-z]{3}[^"]* / [^"]*[а-я]{3}')
+    continuation = re.compile(r'^\s*" / [^"]*[а-яА-Я]')
     for path in sorted(SRC.rglob("*.py")):
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if re.search(r'"[^"]*[a-z]{3}[^"]* / [^"]*[а-я]{3}', line):
+            if single.search(line) or continuation.match(line):
                 bad.append(f"{path.name}:{number}")
     assert bad == []
+
+
+def _call_name(node: ast.Call) -> str | None:
+    return getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+
+
+class _Collector(ast.NodeVisitor):
+    """Один проход: помечает литералы внутри bi() и собирает русские вне него.
+
+    Наивная версия делала вложенные ast.walk и уходила в кубическую сложность —
+    прогон тестов вставал на минуты. Здесь состояние ведётся по стеку визита.
+    """
+
+    def __init__(self, filename: str) -> None:
+        self.filename = filename
+        self.offenders: list[str] = []
+        self._inside_bi = 0
+        self._inside_user_facing = 0
+        self._cyrillic = re.compile(r"[а-яА-ЯёЁ]")
+
+    def visit_Call(self, node: ast.Call) -> None:
+        name = _call_name(node)
+        bi_call = name == "bi"
+        user_facing = name in {"print", "NnError", "Rejection", "Finding"}
+        self._inside_bi += int(bi_call)
+        self._inside_user_facing += int(user_facing)
+        self.generic_visit(node)
+        self._inside_bi -= int(bi_call)
+        self._inside_user_facing -= int(user_facing)
+
+    def visit_Constant(self, node: ast.Constant) -> None:
+        if not isinstance(node.value, str):
+            return
+        unwrapped = self._inside_user_facing and not self._inside_bi
+        if unwrapped and self._cyrillic.search(node.value):
+            self.offenders.append(f"{self.filename}:{node.lineno} {node.value[:40]!r}")
+
+
+def test_every_printed_literal_goes_through_bi():
+    """Русский текст в print/NnError вне bi() означает, что английский режим его не переведёт."""
+    offenders: list[str] = []
+    for path in sorted(SRC.rglob("*.py")):
+        collector = _Collector(path.name)
+        collector.visit(ast.parse(path.read_text(encoding="utf-8")))
+        offenders.extend(collector.offenders)
+    assert offenders == [], offenders

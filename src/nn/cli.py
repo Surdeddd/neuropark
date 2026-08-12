@@ -267,8 +267,12 @@ def _cmd_why(capability: str, in_type: str | None, as_json: bool) -> int:
         print(table(why_rows(choice), WHY_HEADERS))
         if any(r.code == QUOTA_BLOCKED for r in choice.rejected):
             print(
-                "\nу кого-то исчерпано окно квоты: nn run откажется кодом 6,"
-                " пока не передашь --fallback"
+                bi(
+                    "\nsomeone's quota window is exhausted: nn run will refuse with code 6"
+                    " until you pass --fallback",
+                    "\nу кого-то исчерпано окно квоты: nn run откажется кодом 6,"
+                    " пока не передашь --fallback",
+                )
             )
     return int(Exit.OK)
 
@@ -399,15 +403,28 @@ def _cmd_adapt(as_json: bool) -> int:
             )
         )
         return int(Exit.OK)
+    yes, no = bi("yes", "да"), bi("no", "нет")
     rows = [
-        [name, ", ".join(plan.providers), "да" if plan.worktree else "нет"]
+        [name, ", ".join(plan.providers), yes if plan.worktree else no]
         for name, plan in sorted(result.roles.items())
     ]
     print(table(rows, ROLE_HEADERS))
+    if not result.roles:
+        print(
+            bi(
+                "\nno text providers are available, so there is nothing to lay out."
+                " Run nn init and nn scan first.",
+                "\nдоступных текстовых провайдеров нет, раскладывать нечего."
+                " Сделай сначала nn init и nn scan.",
+            )
+        )
+        return int(Exit.OK)
     print(f"\n{bi('written', 'записано')}: {path}")
     print(
-        "edit the order by hand if wrong: it is the fallback chain"
-        " / поправь порядок руками, это цепочка фолбэков"
+        bi(
+            "edit the order by hand if wrong: it is the role's fallback chain",
+            "поправь порядок руками, если он не тот: это цепочка фолбэков роли",
+        )
     )
     return int(Exit.OK)
 

@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from nn.catalog import Catalog
-from nn.paths import state_dir
+from nn.paths import user_data_dir
 from nn.registry import Registry
 
 ROLE_ORDER = ("core", "spec", "mechanics", "frontend", "review", "scout")
@@ -73,6 +73,7 @@ def build(catalog: Catalog, registry: Registry) -> AdaptResult:
 
 
 def write(result: AdaptResult) -> Path:
-    path = state_dir() / "roles.json"
+    """Роли — личные данные, поэтому лежат рядом с личными манифестами, а не в стейте."""
+    path = user_data_dir() / "roles.json"
     path.write_text(json.dumps(result.to_payload(), ensure_ascii=False, indent=2), encoding="utf-8")
     return path

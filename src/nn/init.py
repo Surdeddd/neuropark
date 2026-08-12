@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from nn.detect import Runner, run_detect, shell_runner, which
+from nn.detect import Runner, glob_paths, run_detect, shell_runner, which
 from nn.errors import Exit, NnError
 from nn.i18n import bi
 from nn.paths import data_dir, user_data_dir
@@ -47,10 +47,7 @@ def _pick_model(patterns: list[str], prefer: list[str]) -> Path | None:
     но речевой подходит для голоса, а самый крупный — нет. Иначе берём крупнейший."""
     found: list[Path] = []
     for pattern in patterns:
-        expanded = Path(pattern).expanduser()
-        anchor = Path(expanded.anchor) if expanded.anchor else Path()
-        relative = expanded.relative_to(expanded.anchor) if expanded.anchor else expanded
-        found.extend(path for path in anchor.glob(str(relative)) if path.is_file())
+        found.extend(path for path in glob_paths(pattern) if path.is_file())
     if not found:
         return None
     for wanted in prefer:

@@ -175,8 +175,12 @@ def check(
                 Finding(
                     "warn",
                     provider.id,
-                    f"capability {provider.capability} не описан в capabilities.json —"
-                    " стыковка типов про него не знает",
+                    bi(
+                        f"capability {provider.capability} is absent from capabilities.json,"
+                        " so type stitching knows nothing about it",
+                        f"capability {provider.capability} не описан в capabilities.json —"
+                        " стыковка типов про него не знает",
+                    ),
                 )
             )
 

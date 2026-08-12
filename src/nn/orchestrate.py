@@ -157,6 +157,14 @@ def orchestrate(
     now: datetime | None = None,
 ) -> list[StageResult]:
     moment = now or datetime.now(UTC)
+    if not catalog.roles.roles:
+        raise NnError(
+            Exit.NO_PROVIDER,
+            bi(
+                "no roles are configured: run nn adapt to lay your text providers out across roles",
+                "роли не настроены: сделай nn adapt, он разложит текстовых провайдеров по ролям",
+            ),
+        )
     stages = catalog.roles.patterns.get(pattern, DEFAULT_PATTERN if pattern == "default" else ())
     if not stages:
         known = ", ".join(sorted(catalog.roles.patterns)) or "только default"

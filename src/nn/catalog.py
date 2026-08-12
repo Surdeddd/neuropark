@@ -128,10 +128,15 @@ def load_catalog(root: Path | None = None, *, user_root: Path | None = None) -> 
 
 
 def roles_path(base: Path) -> Path:
-    """roles.json сначала ищется в стейте (его пишет nn adapt под эту машину),
-    и только потом в репозитории как поставляемая заготовка."""
-    from_state = state_dir() / "roles.json"
-    return from_state if from_state.is_file() else base / "roles.json"
+    """Личный roles.json важнее поставляемого.
+
+    Порядок: личные данные ($NN_HOME) → стейт (там его писали более ранние версии,
+    оставлено для совместимости) → поставляемая заготовка в репозитории.
+    """
+    for candidate in (user_data_dir() / "roles.json", state_dir() / "roles.json"):
+        if candidate.is_file():
+            return candidate
+    return base / "roles.json"
 
 
 def _load_roles(base: Path) -> RolesConfig:
