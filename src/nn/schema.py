@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from nn.errors import Exit, NnError
-from nn.model import Bridge, Capability, Host, Provider, Recipe, Step
+from nn.model import Bridge, Capability, Host, Provider, Recipe, Role, RolesConfig, Step
 
 KINDS = {"model", "tool", "agent"}
+STAGES = {"spec", "work", "cross-review", "verdict"}
 HOST_KINDS = {"local", "ssh", "http", "manual"}
 OS_KEYS = {"", "darwin", "linux", "win"}
 
@@ -80,6 +81,7 @@ def parse_provider(raw: dict[str, Any], source: str) -> Provider:
         quota_patterns=tuple(str(x) for x in raw.get("quota_patterns") or ()),
         requires_key=tuple(str(x) for x in raw.get("requires_key") or ()),
         roles=tuple(str(x) for x in raw.get("roles") or ()),
+        vendor=str(raw["vendor"]) if raw.get("vendor") else None,
     )
 
 
@@ -142,6 +144,27 @@ def parse_bridge(raw: dict[str, Any], source: str) -> Bridge:
         run=_templates(raw.get("run"), source, "run"),
         out_ext=str(raw["out_ext"]).lstrip("."),
     )
+
+
+def parse_roles(raw: dict[str, Any], source: str = "roles.json") -> RolesConfig:
+    roles: dict[str, Role] = {}
+    for name, body in (raw.get("roles") or {}).items():
+        providers = tuple(str(x) for x in body.get("providers") or ())
+        if not providers:
+            raise _bad(source, f"roles.{name}.providers")
+        roles[str(name)] = Role(
+            name=str(name),
+            providers=providers,
+            worktree=bool(body.get("worktree", False)),
+        )
+    patterns: dict[str, tuple[str, ...]] = {}
+    for name, stages in (raw.get("patterns") or {}).items():
+        listed = tuple(str(s) for s in stages)
+        unknown = set(listed) - STAGES
+        if unknown:
+            raise _bad(source, f"patterns.{name} (неизвестные стадии: {sorted(unknown)})")
+        patterns[str(name)] = listed
+    return RolesConfig(roles=roles, patterns=patterns)
 
 
 def parse_recipe(raw: dict[str, Any], source: str) -> Recipe:

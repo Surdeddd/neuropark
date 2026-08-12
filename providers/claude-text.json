@@ -1,0 +1,14 @@
+{
+  "id": "claude-text",
+  "capability": "text",
+  "kind": "agent",
+  "rank": 10,
+  "detect": { "bin": "claude" },
+  "io": { "in": ["text"], "out": "text" },
+  "run": "claude -p \"$(cat {prompt_file})\" > {out}",
+  "timeout_s": 1800,
+  "window_h": 5,
+  "quota_patterns": ["usage limit", "rate limit"],
+  "roles": ["core", "review"],
+  "notes": "подписка Max, без API-ключа. сильнее всех на архитектуре и разборе кода, поэтому дефолт для core и review"
+}

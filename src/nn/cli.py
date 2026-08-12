@@ -75,6 +75,15 @@ def build_parser() -> argparse.ArgumentParser:
     recipe_run.add_argument("recipe_id")
     recipe_run.add_argument("input")
 
+    subs.add_parser("adapt", help="собрать roles.json под эту машину")
+
+    orch = subs.add_parser("orchestrate", help="провести задачу по стадиям через роли")
+    orch.add_argument("task")
+    orch.add_argument("--dir", default=".", help="репозиторий, в котором работать")
+    orch.add_argument("--pattern", default="default")
+    orch.add_argument("--role", default="mechanics", help="роль стадии work")
+    orch.add_argument("--fanout", type=int, default=1)
+
     subs.add_parser("doctor", help="проверить целостность каталога")
     subs.add_parser("stats", help="сколько раз что вызывалось")
     return parser
@@ -212,6 +221,59 @@ def _cmd_run(args: argparse.Namespace) -> int:
         if touched:
             print(f"досье обновлены: {', '.join(touched)}", file=sys.stderr)
     return int(exit_code_for(envelope))
+
+
+def _cmd_adapt(as_json: bool) -> int:
+    from nn.adapt import build, write
+
+    catalog = load_catalog()
+    registry = _load_registry()
+    result = build(catalog, registry)
+    path = write(result)
+    if as_json:
+        print(
+            json.dumps(
+                {"roles": str(path), "config": result.to_payload()}, ensure_ascii=False, indent=2
+            )
+        )
+        return int(Exit.OK)
+    rows = [
+        [name, ", ".join(plan.providers), "да" if plan.worktree else "нет"]
+        for name, plan in sorted(result.roles.items())
+    ]
+    print(table(rows, ["роль", "цепочка провайдеров", "worktree"]))
+    print(f"\nзаписано: {path}\nпоправь порядок руками, если он не тот — это цепочка фолбэков")
+    return int(Exit.OK)
+
+
+def _cmd_orchestrate(args: argparse.Namespace) -> int:
+    from nn.orchestrate import orchestrate, save_report
+
+    catalog = load_catalog()
+    registry = _load_registry()
+    repo = Path(args.dir).expanduser().resolve()
+    results = orchestrate(
+        args.task,
+        catalog=catalog,
+        registry=registry,
+        repo=repo,
+        pattern=args.pattern,
+        work_role=args.role,
+        fanout=args.fanout,
+        exhausted=_exhausted(catalog),
+    )
+    run_id = results[0].envelope.run_id if results else "empty"
+    path = save_report(results, run_id)
+    patches = [item.patch for item in results if item.patch]
+    print(f"отчёт: {path}")
+    for patch in patches:
+        print(f"патч: {patch} (НЕ применён — мерж твой)")
+    failed = [item for item in results if item.envelope.outcome != "success"]
+    if failed:
+        names = ", ".join(f"{i.stage}/{i.provider}: {i.envelope.outcome}" for i in failed)
+        print(f"неудачные стадии: {names}", file=sys.stderr)
+        return int(Exit.PROVIDER_FAILED)
+    return int(Exit.OK)
 
 
 def _cmd_learn(as_json: bool) -> int:
@@ -407,6 +469,10 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_quota(args.json)
         if args.command == "learn":
             return _cmd_learn(args.json)
+        if args.command == "adapt":
+            return _cmd_adapt(args.json)
+        if args.command == "orchestrate":
+            return _cmd_orchestrate(args)
         if args.command == "burn":
             return _cmd_burn(args)
         if args.command == "recipe":

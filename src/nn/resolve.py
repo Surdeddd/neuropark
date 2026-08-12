@@ -53,6 +53,65 @@ def _sort_key(
     )
 
 
+def resolve_role(
+    role_name: str,
+    *,
+    catalog: Catalog,
+    registry: Registry,
+    exclude_vendors: frozenset[str] = frozenset(),
+    exhausted: frozenset[str] = frozenset(),
+    system: str | None = None,
+) -> Choice:
+    """Провайдер под роль по цепочке из roles.json.
+
+    Цепочка объявлена человеком в roles.json, поэтому проход по ней — это не
+    молчаливая подмена, а заранее выданное согласие. Исчерпанные окна и
+    исключённые вендоры (ревью не должно идти тем же вендором, что писал патч)
+    просто пропускаются, а причины сохраняются в rejected.
+    """
+    role = catalog.roles.roles.get(role_name)
+    if role is None:
+        known = ", ".join(sorted(catalog.roles.roles)) or "ни одной"
+        raise NnError(Exit.NO_PROVIDER, f"роль {role_name} не описана (есть: {known})")
+
+    rejected: list[Rejection] = []
+    for provider_id in role.providers:
+        provider = catalog.providers.get(provider_id)
+        if provider is None:
+            rejected.append(Rejection(provider_id, "нет такого манифеста"))
+            continue
+        if provider.vendor_name in exclude_vendors:
+            rejected.append(Rejection(provider_id, f"вендор {provider.vendor_name} исключён"))
+            continue
+        if provider_id in exhausted:
+            rejected.append(Rejection(provider_id, "окно квоты исчерпано"))
+            continue
+        host = catalog.hosts.get(provider.host)
+        if host is None:
+            rejected.append(Rejection(provider_id, f"хост {provider.host} не описан"))
+            continue
+        entry = registry.get(provider_id)
+        if entry is None or entry.status != "ok":
+            status = entry.status if entry else "нет в реестре"
+            rejected.append(Rejection(provider_id, f"статус: {status}"))
+            continue
+        if not provider.adapter and pick(provider.run, system=system) is None:
+            rejected.append(Rejection(provider_id, "нет шаблона run под текущую ОС"))
+            continue
+        return Choice(
+            provider=provider,
+            host=host,
+            bridge=None,
+            manual=(host.kind == "manual" or not host.auto),
+            in_type="text",
+            out_type="text",
+            rejected=tuple(rejected),
+        )
+
+    summary = "; ".join(f"{r.provider}: {r.reason}" for r in rejected) or "цепочка пуста"
+    raise NnError(Exit.NO_PROVIDER, f"под роль {role_name} никого не нашлось — {summary}")
+
+
 def resolve(
     capability: str,
     *,

@@ -31,6 +31,13 @@ class Provider:
     quota_patterns: tuple[str, ...] = ()
     requires_key: tuple[str, ...] = ()
     roles: tuple[str, ...] = ()
+    # вендор нужен оркестрации: ревью патча обязано идти другим вендором,
+    # иначе модель проверяет саму себя. По умолчанию — префикс id до первого дефиса
+    vendor: str | None = None
+
+    @property
+    def vendor_name(self) -> str:
+        return self.vendor or self.id.split("-")[0]
 
 
 @dataclass(frozen=True)
@@ -80,3 +87,16 @@ class Recipe:
     description: str
     steps: tuple[Step, ...]
     on_quota: str = "fail"
+
+
+@dataclass(frozen=True)
+class Role:
+    name: str
+    providers: tuple[str, ...]
+    worktree: bool = False
+
+
+@dataclass(frozen=True)
+class RolesConfig:
+    roles: dict[str, Role] = field(default_factory=dict)
+    patterns: dict[str, tuple[str, ...]] = field(default_factory=dict)

@@ -7,9 +7,16 @@ from pathlib import Path
 from typing import Any, Protocol, TypeVar
 
 from nn.errors import Exit, NnError
-from nn.model import Bridge, Capability, Host, Provider, Recipe
-from nn.paths import data_dir
-from nn.schema import parse_bridge, parse_capabilities, parse_host, parse_provider, parse_recipe
+from nn.model import Bridge, Capability, Host, Provider, Recipe, RolesConfig
+from nn.paths import data_dir, state_dir
+from nn.schema import (
+    parse_bridge,
+    parse_capabilities,
+    parse_host,
+    parse_provider,
+    parse_recipe,
+    parse_roles,
+)
 
 
 @dataclass(frozen=True)
@@ -20,6 +27,7 @@ class Catalog:
     types: dict[str, tuple[str, ...]]
     bridges: dict[str, Bridge]
     recipes: dict[str, Recipe]
+    roles: RolesConfig = RolesConfig()
 
 
 class HasId(Protocol):
@@ -71,4 +79,19 @@ def load_catalog(root: Path | None = None) -> Catalog:
         types=types,
         bridges=_load_dir(base, "bridges", parse_bridge),
         recipes=_load_dir(base, "recipes", parse_recipe),
+        roles=_load_roles(base),
     )
+
+
+def roles_path(base: Path) -> Path:
+    """roles.json сначала ищется в стейте (его пишет nn adapt под эту машину),
+    и только потом в репозитории как поставляемая заготовка."""
+    from_state = state_dir() / "roles.json"
+    return from_state if from_state.is_file() else base / "roles.json"
+
+
+def _load_roles(base: Path) -> RolesConfig:
+    path = roles_path(base)
+    if not path.is_file():
+        return RolesConfig()
+    return parse_roles(_read(path), source=str(path))

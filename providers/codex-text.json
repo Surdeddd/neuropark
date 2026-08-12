@@ -1,0 +1,14 @@
+{
+  "id": "codex-text",
+  "capability": "text",
+  "kind": "agent",
+  "rank": 8,
+  "detect": { "bin": "codex" },
+  "io": { "in": ["text"], "out": "text" },
+  "run": "codex exec --skip-git-repo-check -o {out} \"$(cat {prompt_file})\"",
+  "timeout_s": 1800,
+  "window_h": 5,
+  "quota_patterns": ["usage limit", "rate limit", "quota"],
+  "roles": ["spec", "mechanics"],
+  "notes": "подписка ChatGPT через OAuth. силён в следовании узкой спеке, поэтому дефолт для spec. флаг -o кладёт последнее сообщение прямо в файл"
+}
