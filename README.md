@@ -1,52 +1,58 @@
-# nn — каталог парка нейронок и единый контракт вызова
+# nn — neural park catalog and a single calling contract
 
-Парк нейронок разъезжается по машинам и рантаймам: пять agent-CLI, whisper в трёх разных папках, MLX-модели, ComfyUI на другой машине, облачные генераторы, локальный TTS, эмбеддер. Знание «чем это сделать, где оно лежит, какими флагами звать» живёт в голове, а каждая новая цепочка собирается руками заново.
+**Русская версия: [README.ru.md](README.ru.md)**
 
-`nn` делает две вещи:
+A neural park drifts across machines and runtimes: five agent CLIs, whisper models in three different folders, MLX models, ComfyUI on another box, cloud generators, a local TTS, an embedder. The knowledge of "what does this, where it lives, which flags it takes" lives in someone's head, and every new chain gets wired by hand again.
 
-1. **Анализ парка** — единый реестр всех нейронок на всех машинах: что есть, где, живое ли, чем отличается от соседа по той же задаче. `nn ls` показывает парк, `nn why` объясняет, почему выбран именно этот провайдер и чем не подошли остальные.
-2. **Быстрая интеграция** — единый контракт вызова: `nn run <capability> <файл>`. Выход одного шага годится входом другому, несовпадение типов закрывается мостиком автоматически, цепочки описываются рецептами в JSON.
+`nn` does two things:
 
-Ключевой принцип: **универсальность через данные, не через код**. В движке нет списка нейронок, списка машин и списка capability — всё это файлы. Добавить нейронку = один файл манифеста. Добавить машину = один файл хоста. Новый сценарий = один файл рецепта.
+1. **Park analysis** — one registry of every neural tool on every machine: what exists, where, whether it is alive, how it differs from its neighbour for the same job. `nn ls` shows the park, `nn why` explains which provider was picked and why the others were rejected.
+2. **Fast integration** — a single calling contract: `nn run <capability> <file>`. The output of one step feeds the next, type mismatches are closed by a bridge automatically, and chains are described by JSON recipes.
 
-## Установка
+The core principle: **universality through data, not code**. The engine holds no list of tools, machines or capabilities — all of that is files. Adding a tool is one manifest file. Adding a machine is one host file. A new scenario is one recipe file.
+
+## Installation
 
 ```bash
 git clone <repo> ~/Projects/Personal/neuropark
 cd ~/Projects/Personal/neuropark && ./install.sh
 ```
 
-`install.sh` идемпотентен: проверяет python, подключает скилл симлинком в `~/.claude/skills/nn`, подсказывает строку для PATH и делает первый скан парка. Как плагин Claude Code ставится через marketplace-манифест в `.claude-plugin/` — тогда появляется слэш-команда `/nn`.
+`install.sh` is idempotent: it checks python, symlinks the skill into `~/.claude/skills/nn`, prints the PATH line to add, and runs the first park scan. As a Claude Code plugin it installs through the marketplace manifest in `.claude-plugin/`, which also gives you the `/nn` slash command.
 
-Рантайму нужен только python 3.11+ из stdlib — ни одной внешней зависимости. Инструменты разработки (pytest, ruff, mypy) ставятся отдельно, `make check` поднимает pytest через `uv`.
+Runtime needs python 3.11+ from stdlib only — zero external dependencies. Dev tools (pytest, ruff, mypy) are separate; `make check` pulls pytest through `uv`.
 
-## Быстрый старт
+## Language
+
+The product speaks both English and Russian. Pick with `NN_LANG=en` or `NN_LANG=ru`; without it the language follows `LC_ALL`/`LANG`, falling back to English. This covers command help, messages, table headers and provider notes.
+
+## Quick start
 
 ```bash
-nn scan                                   # обойти детекты, записать реестр
-nn ls                                     # весь парк таблицей
-nn ls transcribe                          # только один capability
-nn why transcribe --in-type video         # кто выбран, кто отклонён и почему
-nn run transcribe video.mp4               # видео → сабы (мостик вставится сам)
-nn run tts текст.txt                      # текст → голос
-nn run image промпт.txt -o poster.png     # промпт → картинка
-nn recipe ls                              # готовые цепочки
-nn recipe run bilingual-subs clip.mp4     # транскрипт → перевод → вжигание сабов
-nn quota                                  # окна квот: сожжено, что простаивает
-nn burn add image промпт.txt              # отложить задачу под свободную квоту
-nn burn run                               # показать, что можно прожечь (--yes чтобы запустить)
-nn adapt                                  # собрать roles.json под эту машину
-nn orchestrate "починить парсер" --dir .   # спека → работа в worktree → ревью → вердикт
-nn learn                                  # сжать новые исходы в досье провайдеров
-nn doctor                                 # что сломано в каталоге
-nn stats                                  # сколько раз что вызывалось
+nn scan                                   # probe detectors, write the registry
+nn ls                                     # the whole park as a table
+nn ls transcribe                          # a single capability
+nn why transcribe --in-type video         # who was picked, who was rejected and why
+nn run transcribe video.mp4               # video → subtitles (bridge inserts itself)
+nn run tts text.txt                       # text → voice
+nn run image prompt.txt -o poster.png     # prompt → picture
+nn recipe ls                              # ready-made chains
+nn recipe run bilingual-subs clip.mp4     # transcript → translation → burned-in subs
+nn quota                                  # quota windows: burned, idle
+nn burn add image prompt.txt              # queue work for a free window
+nn burn run                               # show what can be burned (--yes to execute)
+nn adapt                                  # build roles.json for this machine
+nn orchestrate "fix the parser" --dir .   # spec → work in a worktree → review → verdict
+nn learn                                  # distil run outcomes into provider dossiers
+nn doctor                                 # what is broken in the catalog
+nn stats                                  # what actually gets used
 ```
 
-Каждый `nn run` печатает JSON-конверт: провайдер, хост, выходной файл, мостик, время, класс исхода, путь к логу. `--json` у `ls`/`why` даёт машинный вывод для агентов.
+Every `nn run` prints a JSON envelope: provider, host, output file, bridge, duration, outcome class, log path. `--json` on `ls`/`why` gives machine-readable output for agents.
 
-## Как добавить нейронку
+## Adding a neural tool
 
-Один файл в `providers/<id>.json`, где `<id>` совпадает с именем файла:
+One file in `providers/<id>.json`, where `<id>` matches the file name:
 
 ```json
 {
@@ -60,30 +66,33 @@ nn stats                                  # сколько раз что выз�
   "pre": "ffmpeg -nostdin -y -i {in} -ar 16000 -ac 1 {tmp}.wav",
   "run": "whisper-cli -m {model} -f {tmp}.wav -osrt -of {out_base} -l auto",
   "timeout_s": 3600,
-  "notes": "самый точный локально, вдвое медленнее turbo. вход приводится к 16k mono в pre"
+  "notes": {
+    "en": "most accurate locally, roughly twice slower than turbo",
+    "ru": "самый точный локально, примерно вдвое медленнее turbo"
+  }
 }
 ```
 
-| поле | смысл |
+| field | meaning |
 |---|---|
-| `capability` | что умеет. Одна нейронка с двумя умениями = два манифеста |
+| `capability` | what it does. One tool with two skills means two manifests |
 | `kind` | `model` \| `tool` \| `agent` |
-| `host` | id хоста, по умолчанию `local` |
-| `rank` | больше — приоритетнее среди доступных |
-| `detect` | как проверить наличие: `bin`, `files`, `glob`, `env`, `http`, `python`, `npm`, `docker`, `brew`. Все условия соединяются логическим И |
-| `requires_key` | env-переменные; их отсутствие даёт статус `needs-key`, а не «нет такой нейронки» |
-| `io.in` / `io.out` | классы типов из `capabilities.json`. `out: "same"` — тип сохраняется |
-| `io.out_ext` | если провайдер пишет не первым расширением класса (ben-voice всегда кодирует opus → `ogg`) |
-| `vars` | подстановки для шаблонов, раскрываются `~` и `$ENV` |
-| `pre` / `run` / `post` | шаблоны команд. Допускаются per-os варианты: `"run": {"darwin": "...", "linux": "..."}` |
-| `quota_patterns` | регулярки по stderr, по которым видно исчерпание окна |
-| `notes` | обязательны: скорость, качество, известные грабли |
+| `host` | host id, `local` by default |
+| `rank` | higher wins among available providers |
+| `detect` | how to check presence: `bin`, `files`, `glob`, `env`, `http`, `python`, `npm`, `docker`, `brew`. All conditions are ANDed |
+| `requires_key` | env variables; missing ones give status `needs-key`, not "no such tool" |
+| `io.in` / `io.out` | type classes from `capabilities.json`. `out: "same"` preserves the input type |
+| `io.out_ext` | when the provider writes something other than the class's first extension (ben-voice always encodes opus → `ogg`) |
+| `vars` | template substitutions; `~` and `$ENV` are expanded |
+| `pre` / `run` / `post` | command templates. Per-OS variants allowed: `"run": {"darwin": "...", "linux": "..."}` |
+| `quota_patterns` | stderr regexes that mean the window is exhausted |
+| `notes` | required, bilingual `{en, ru}`: speed, quality, known gotchas |
 
-Переменные шаблонов: `{in}`, `{out}`, `{out_base}`, `{tmp}`, `{dir}`, `{prompt_file}`, `{extra0}`, `{host.paths.<ключ>}` плюс всё из `vars`. Неизвестная переменная — ошибка валидации, а не пустая подстановка.
+Template variables: `{in}`, `{out}`, `{out_base}`, `{tmp}`, `{dir}`, `{prompt_file}`, `{extra0}`, `{host.paths.<key>}` plus everything from `vars`. An unknown variable is a validation error, not an empty substitution.
 
-Три живых примера в репозитории: локальный бинарь (`whisper-cpp-large-v3`), python-скрипт со своим интерпретатором (`ben-voice-clone`), удалённая декларация без запуска (`comfy-zimage`).
+Three live examples ship with the repo: a local binary (`whisper-cpp-large-v3`), a python script with its own interpreter (`ben-voice-clone`), and a remote declaration that is never executed (`comfy-zimage`).
 
-## Как добавить машину
+## Adding a machine
 
 `hosts/<id>.json`:
 
@@ -91,61 +100,62 @@ nn stats                                  # сколько раз что выз�
 { "id": "winpc", "kind": "ssh", "addr": "winpc-cc", "os": "windows", "auto": false,
   "probe": "ssh -o ConnectTimeout=3 -o BatchMode=yes winpc-cc true",
   "paths": { "comfy": "http://127.0.0.1:8188" },
-  "notes": "засыпает посреди джоба" }
+  "notes": "falls asleep mid-job" }
 ```
 
-`kind`: `local` · `ssh` · `http` · `manual`. **`auto: false` означает, что `nn` печатает готовую команду, но сам её не запускает** — так удалённые нейронки попадают в каталог и в `why`, не притаскивая класс багов про сон и сеть.
+`kind`: `local` · `ssh` · `http` · `manual`. **`auto: false` means `nn` prints the ready command but never runs it** — that is how remote tools stay in the catalog and in `why` without dragging in the whole class of sleep-and-network bugs.
 
-Секреты в файлах хостов допускаются только ссылкой: `"ANTHROPIC_API_KEY": "@file:~/.config/maxim-secrets/ethereal.key"`. Значение читается в момент запуска и в git не попадает.
+Secrets in host files are allowed only by reference: `"ANTHROPIC_API_KEY": "@file:~/.config/secrets/key"`. The value is read at run time and never lands in git.
 
-## Как добавить сценарий
+## Adding a scenario
 
-`recipes/<id>.json`, шаг ссылается на `capability`, выход шага N по умолчанию становится входом N+1:
+`recipes/<id>.json`. A step names a `capability`; the output of step N becomes the input of N+1:
 
 ```json
 { "id": "bilingual-subs",
-  "description": "видео → транскрипт → перевод → вжжённые сабы",
+  "description": "video → transcript → translation → burned-in subtitles",
   "steps": [
     { "capability": "transcribe" },
     { "capability": "translate", "vars": { "lang": "ru" } },
     { "capability": "subtitle-burn", "in": "{input}", "extra_in": ["{step1.out}"] }
-  ] }
+  ],
+  "on_quota": "fail" }
 ```
 
-Ссылки: `{input}` — исходный вход рецепта, `{stepK.out}` — выход K-го шага (индексация с нуля, ссылка вперёд запрещена). `extra_in` подаёт дополнительные входы для capability, которым нужно два файла (вжигание сабов, подмена звука).
+References: `{input}` is the recipe's original input, `{stepK.out}` is the output of step K (zero-indexed, forward references are rejected). `extra_in` feeds capabilities that need two files, like burning subtitles or swapping an audio track. `on_quota` is `fail` (default) or `fallback`.
 
-## Коды выхода
+## Exit codes
 
-| код | что значит |
+| code | meaning |
 |---|---|
-| `0` | успех |
-| `2` | нет доступного провайдера под capability |
-| `3` | требуется ручной запуск, команда напечатана |
-| `4` | провайдер упал |
-| `5` | реестра нет либо он старше 30 дней — нужен `nn scan` |
-| `6` | окно квоты исчерпано |
-| `7` | невалидный манифест, шаблон или рецепт |
-| `8` | тип входа не поддержан и мостика нет, либо не хватает обязательного `--extra` |
+| `0` | success |
+| `2` | no available provider for the capability |
+| `3` | manual run required, the command was printed |
+| `4` | the provider failed |
+| `5` | no registry, or it is older than 30 days — run `nn scan` |
+| `6` | quota window exhausted |
+| `7` | invalid manifest, template or recipe |
+| `8` | input type unsupported and no bridge, or a required `--extra` is missing |
 
-Классы исхода в конверте и журнале: `success` · `empty` · `timeout` · `quota` · `refused` · `crash`. `exit 0` успехом сам по себе не считается — пустой файл и ответ вида «Ready to work. What's the task?» распознаются как `empty`.
+Outcome classes in the envelope and the run log: `success` · `empty` · `timeout` · `quota` · `refused` · `crash`. `exit 0` alone is not proof of success — an empty file or a reply like "Ready to work. What's the task?" is classified as `empty`.
 
-## Квоты
+## Quotas
 
-Ничего вводить руками не надо: `quota.json` целиком считается из `runs.jsonl`. Манифест объявляет `window_h` (длина скользящего окна) и по желанию `soft_cap_calls`. Исчерпание определяется двумя путями — счётчик дошёл до `soft_cap_calls`, либо в окне был запуск с исходом `quota` (распознаётся по `quota_patterns` в stderr), и тогда окно считается закрытым до его конца.
+Nothing to fill in by hand: `quota.json` is computed entirely from `runs.jsonl`. A manifest declares `window_h` (rolling window length) and optionally `soft_cap_calls`. Exhaustion is detected two ways — the counter reaches `soft_cap_calls`, or a run inside the window had outcome `quota` (recognised by `quota_patterns` in stderr), which closes the window until its end.
 
-`window_h` прописан только там, где длина окна известна фактически (подписки Anthropic и ChatGPT — 5 часов). У Grok Imagine он намеренно пуст: выдуманное число врало бы в отчётах `nn quota`.
+`window_h` is only set where the window length is a known fact (Anthropic and ChatGPT subscriptions are 5 hours). It is deliberately empty for Grok Imagine: a made-up number would lie in `nn quota` reports.
 
-`nn burn` берёт окна, которые вот-вот закроются неиспользованными, сопоставляет их с очередью `burn-queue.jsonl` и показывает предложение. Без `--yes` ничего не запускается.
+`nn burn` takes windows about to close unused, matches them against the `burn-queue.jsonl` queue and shows a proposal. Nothing runs without `--yes`.
 
-## Досье провайдеров
+## Provider dossiers
 
-Заполняются сами — это главное отличие от предшественника, чьи досье так и остались пустыми, потому что требовали ручного посева.
+They fill themselves — the key difference from the predecessor, whose dossiers stayed empty because they required manual seeding.
 
-Движок читает новые строки `runs.jsonl` от вотермарки и сжимает неудачи в уроки без всякого LLM: три пустых ответа на одном capability, два таймаута, три повтора одной подписи ошибки (первая строка stderr без чисел и путей — у питоновского трейсбека берётся последняя, потому что суть там). Готовый совет выдаётся, только если подпись совпала с известным правилом из `dossier-rules.json`; всё остальное фиксируется как факт со счётчиком и датой, без выдуманных рекомендаций.
+The engine reads new `runs.jsonl` lines from a watermark and distils failures into lessons with no LLM involved: three empty answers on one capability, two timeouts, three repeats of one error signature (the first stderr line stripped of numbers and paths — for a python traceback the last line is taken, because that is where the meaning is). A ready instruction is emitted only when the signature matches a known rule from `dossier-rules.json`; everything else is recorded as a fact with a counter and a date, without invented advice.
 
-Досье живёт в `~/.claude/nn/dossiers/<провайдер>.md` двумя разделами: `observed` (факты) и `instructions` (императивы). Ограничение 40 строк, старые наблюдения вытесняются. В промпт подмешивается только `instructions`, отключается флагом `--no-dossier`. `nn learn` запускается руками, а после 20 новых записей срабатывает сам.
+A dossier lives in `~/.claude/nn/dossiers/<provider>.md` with two sections: `observed` (facts) and `instructions` (imperatives). Capped at 40 lines, oldest observations evicted. Only `instructions` is injected into prompts; `--no-dossier` turns that off. `nn learn` runs by hand, and fires automatically after 20 new records.
 
-Реальный пример, собранный движком из сегодняшних падений:
+A real example the engine assembled from live failures:
 
 ```
 ## observed
@@ -155,50 +165,50 @@ nn stats                                  # сколько раз что выз�
 - у провайдера свой интерпретатор: проверь vars.py в манифесте, системный python не годится
 ```
 
-## Оркестрация
+## Orchestration
 
-`nn adapt` раскладывает доступные текстовые провайдеры по ролям — детерминированно, из результатов скана и подсказок `roles` в манифестах, без всякого LLM. Файл пишется в `~/.claude/nn/roles.json` и правится руками: порядок в `providers` — это цепочка фолбэков роли.
+`nn adapt` distributes available text providers across roles — deterministically, from scan results and `roles` hints in manifests, with no LLM. The file lands in `~/.claude/nn/roles.json` and is meant to be hand-edited: the order in `providers` is the role's fallback chain.
 
-`nn orchestrate "<задача>"` проводит задачу по стадиям. Соответствие стадия → роль жёсткое: `spec` → роль `spec`, `work` → `mechanics` (или `--role frontend`), `cross-review` → `review`, `verdict` → `core`. Маршрут детерминированный, LLM работает только внутри провайдеров.
+`nn orchestrate "<task>"` drives the task through stages. Stage-to-role mapping is fixed: `spec` → role `spec`, `work` → `mechanics` (or `--role frontend`), `cross-review` → `review`, `verdict` → `core`. The route is deterministic; LLMs only work inside providers.
 
-Две гарантии:
+Two guarantees:
 
-- **Ревью идёт другим вендором,** чем автор патча — модель не проверяет саму себя. Вендор берётся из поля `vendor` либо из префикса `id`.
-- **Патч не применяется никогда.** Роль с `worktree: true` работает в изолированном `git worktree` от HEAD, наружу отдаётся `.patch` файл. Мерж — твоё решение. Репозиторий в состоянии rebase/merge отклоняется до создания worktree.
+- **Review goes to a different vendor** than the patch author — no model reviews itself. The vendor comes from the `vendor` field or the `id` prefix.
+- **A patch is never applied.** A role with `worktree: true` works in an isolated `git worktree` off HEAD and hands back a `.patch` file. Merging is your decision. A repository mid-rebase or mid-merge is rejected before the worktree is created.
 
-`--fanout N` запускает N исполнителей на одной задаче в отдельных worktree, каждый со своим патчем — ревью и вердикт получают все.
+`--fanout N` runs N workers on one task in separate worktrees, each with its own patch — review and verdict see all of them.
 
-Патчи пишутся с `core.quotePath=false`, чтобы кириллические имена файлов оставались читаемыми, а не превращались в восьмеричные коды.
+Patches are written with `core.quotePath=false` so non-ASCII file names stay readable instead of turning into octal escapes.
 
-## Свежесть каталога
+## Catalog freshness
 
-Скан запускает человек: `nn scan`. Расписаний, фоновых заданий и уведомлений в мессенджер тут нет намеренно — меньше инфраструктуры, меньше поводов ей сгнить.
+The human runs the scan: `nn scan`. There are deliberately no schedules, background jobs or messenger notifications — less infrastructure, fewer things to rot.
 
-Скан сам показывает, что изменилось с прошлого раза: какая нейронка появилась, какая исчезла, у кого сменился статус или подъехала новая версия. Первый скан дрейфом не считается. Если реестр старше 30 дней, любая команда напомнит про `nn scan` кодом 5.
+The scan itself reports what changed since last time: which tool appeared, which disappeared, whose status changed or version moved. The first scan does not count as drift. If the registry is older than 30 days, any command reminds you with exit code 5.
 
-## Два правила, которые движок не нарушает
+## Two rules the engine never breaks
 
-- **Никаких молчаливых подмен модели.** Если у лучшего провайдера исчерпано окно, `nn` не берёт втихую следующего: он падает с кодом 6, называет живую альтернативу и предлагает `--fallback`. Подмена происходит только когда ты сам попросил.
-- **Ничего не применяется само.** Хост с `auto: false` печатает команду, патчи (фаза 5) не мержатся, скан только читает, `burn` без `--yes` только предлагает.
+- **No silent model substitution.** If the best provider's window is exhausted, `nn` does not quietly take the next one: it fails with code 6, names the live alternative and suggests `--fallback`. Substitution happens only when you asked for it.
+- **Nothing is applied automatically.** A host with `auto: false` prints the command, patches are not merged, the scan only reads, and `burn` without `--yes` only proposes.
 
-## Разработка
+## Development
 
 ```bash
-make check        # ruff + mypy --strict + юниты (без сети, ~2 секунды)
-make smoke-fast   # живые прогоны офлайн: скан, транскрипт, мостик, доктор (~30 секунд)
-make smoke        # плюс TTS с холодным стартом MLX (до 15 минут)
+make check        # ruff + mypy --strict + unit tests, no network, ~10 seconds
+make smoke-fast   # live offline runs: scan, transcript, bridge, doctor (~30 seconds)
+make smoke        # plus TTS with a cold MLX start (up to 15 minutes)
 ```
 
-Полная цепочка `bilingual-subs` в автотесты не входит: её третий шаг зовёт `claude -p`, то есть тратит подписку. Проверяется вручную либо фейковыми провайдерами в `tests/test_integration_chain.py`.
+The full `bilingual-subs` chain is not in the automated suite: its third step calls `claude -p` and spends a subscription. Verify it by hand or through the fake providers in `tests/test_integration_chain.py`.
 
-## Что дальше
+## What is next
 
-Все шесть фаз закрыты: ядро, стыковка, квоты, досье, оркестрация, упаковка. Осознанно не реализовано и честно сообщает об этом вместо тихого падения:
+All six phases are closed: core, type stitching, quotas, dossiers, orchestration, packaging. Deliberately not implemented, and saying so explicitly instead of failing silently:
 
-- транспорты `ssh` и `http` — удалённые хосты работают через `auto: false`, то есть печатают команду. Включать, когда надоест копировать её руками.
-- провайдеры с `adapter` (скрипт вместо шаблона) — понадобятся для ComfyUI с очередью и опросом статуса.
-- рецепты с несколькими входами и шаги с `role` внутри рецептов.
+- `ssh` and `http` transports — remote hosts work through `auto: false`, i.e. they print the command. Wire them when copying that command by hand gets old.
+- providers with an `adapter` script instead of a template — needed for ComfyUI with a queue and status polling.
+- recipes with multiple inputs and `role` steps inside recipes.
 
-Проверять, что из этого действительно нужно, стоит по `nn stats`: если фича месяц с нулём вызовов — её выпиливают, а не доделывают.
+Whether any of that is actually needed should be judged by `nn stats`: a feature with zero calls for a month gets deleted, not finished.
 
-Спека: `docs/superpowers/specs/2026-08-12-nn-design.md`. План фаз 1–2: `docs/superpowers/plans/2026-08-12-nn-phases-1-2.md`.
+Spec: `docs/superpowers/specs/2026-08-12-nn-design.md`. Phase 1–2 plan: `docs/superpowers/plans/2026-08-12-nn-phases-1-2.md`.

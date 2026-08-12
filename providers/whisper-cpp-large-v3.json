@@ -5,12 +5,24 @@
   "rank": 10,
   "detect": {
     "bin": "whisper-cli",
-    "files": ["~/Models/whisper/ggml-large-v3.bin"]
+    "files": [
+      "~/Models/whisper/ggml-large-v3.bin"
+    ]
   },
-  "vars": { "model": "~/Models/whisper/ggml-large-v3.bin" },
-  "io": { "in": ["audio"], "out": "srt" },
+  "vars": {
+    "model": "~/Models/whisper/ggml-large-v3.bin"
+  },
+  "io": {
+    "in": [
+      "audio"
+    ],
+    "out": "srt"
+  },
   "pre": "ffmpeg -nostdin -y -i {in} -ar 16000 -ac 1 {tmp}.wav",
   "run": "whisper-cli -m {model} -f {tmp}.wav -osrt -of {out_base} -l auto",
   "timeout_s": 3600,
-  "notes": "самый точный локально, примерно вдвое медленнее turbo. вход приводится к 16k mono в pre"
+  "notes": {
+    "en": "most accurate locally, roughly twice slower than turbo; input is normalised to 16k mono in the pre step",
+    "ru": "самый точный локально, примерно вдвое медленнее turbo. вход приводится к 16k mono в pre"
+  }
 }

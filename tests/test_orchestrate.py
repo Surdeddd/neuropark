@@ -50,9 +50,7 @@ def build_catalog(providers: list[Provider], roles: RolesConfig) -> tuple[Catalo
     registry = Registry(
         hostname="testbox",
         generated_at=NOW.isoformat(),
-        entries={
-            p.id: Entry(p.id, "local", "ok", "", None, NOW.isoformat()) for p in providers
-        },
+        entries={p.id: Entry(p.id, "local", "ok", "", None, NOW.isoformat()) for p in providers},
     )
     return catalog, registry
 
@@ -155,9 +153,7 @@ def test_full_pattern_runs_four_stages(repo):
     catalog, registry = build_catalog(
         [prov("alpha-cli", vendor="alpha"), prov("beta-cli", vendor="beta")], full_roles()
     )
-    results = orchestrate(
-        "починить парсер", catalog=catalog, registry=registry, repo=repo, now=NOW
-    )
+    results = orchestrate("починить парсер", catalog=catalog, registry=registry, repo=repo, now=NOW)
     assert [item.stage for item in results] == ["spec", "work", "cross-review", "verdict"]
     assert all(item.envelope.outcome == "success" for item in results)
 

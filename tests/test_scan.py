@@ -68,9 +68,7 @@ def test_unreachable_host_yields_stale_and_keeps_previous_data(monkeypatch, tmp_
     previous = Registry(
         hostname="testbox",
         generated_at="2026-08-01T00:00:00+00:00",
-        entries={
-            "comfy": Entry("comfy", "winpc", "ok", "", "1.0", "2026-08-01T00:00:00+00:00")
-        },
+        entries={"comfy": Entry("comfy", "winpc", "ok", "", "1.0", "2026-08-01T00:00:00+00:00")},
     )
 
     def runner(command, *, timeout):

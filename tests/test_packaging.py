@@ -25,10 +25,11 @@ def test_skill_has_frontmatter_with_triggers():
     assert text.startswith("---\n")
     head = text.split("---", 2)[1]
     assert "name: nn" in head
-    # явные триггеры «когда звать» — иначе скилл не будет вызываться сам
-    assert "Триггеры" in head
-    for trigger in ("транскриб", "озвуч", "картинк", "парк нейронок"):
-        assert trigger in head, trigger
+    assert "Triggers" in head
+    for russian in ("транскриб", "озвуч", "картинк", "парк нейронок"):
+        assert russian in head, russian
+    for english in ("transcribe", "voice over", "generate image", "neural park"):
+        assert english in head, english
 
 
 def test_skill_documents_exit_codes_and_outcomes():
@@ -72,6 +73,36 @@ def test_no_autoschedule_left_anywhere():
         assert "launchctl" not in text, path
         assert "schtasks" not in text, path
         assert "notify-maxim" not in text, path
+
+
+def test_readme_exists_in_both_languages():
+    english = (ROOT / "README.md").read_text(encoding="utf-8")
+    russian = (ROOT / "README.ru.md").read_text(encoding="utf-8")
+    assert "README.ru.md" in english
+    assert "README.md" in russian
+    assert "neural park catalog" in english.lower()
+    assert "каталог парка нейронок" in russian
+
+
+def test_memory_bank_follows_canonical_structure():
+    """Каноническая структура Cline: шесть файлов с иерархией зависимостей."""
+    bank = ROOT / "MEMORY_BANK"
+    assert bank.is_dir()
+    required = {
+        "projectbrief.md",
+        "productContext.md",
+        "systemPatterns.md",
+        "techContext.md",
+        "activeContext.md",
+        "progress.md",
+    }
+    present = {path.name for path in bank.glob("*.md")}
+    assert required <= present, required - present
+
+
+def test_memory_bank_is_gitignored():
+    ignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+    assert "MEMORY_BANK" in ignore
 
 
 def test_version_in_plugin_matches_cli():

@@ -225,9 +225,7 @@ def test_no_run_template_for_os_is_rejected():
     )
     catalog, registry = build([provider])
     with pytest.raises(NnError) as err:
-        resolve(
-            "transcribe", catalog=catalog, registry=registry, in_type="audio", system="Darwin"
-        )
+        resolve("transcribe", catalog=catalog, registry=registry, in_type="audio", system="Darwin")
     assert "под текущую ОС" in err.value.message
 
 

@@ -3,12 +3,28 @@
   "capability": "translate",
   "kind": "agent",
   "rank": 10,
-  "detect": { "bin": "claude" },
-  "vars": { "lang": "ru" },
-  "io": { "in": ["srt", "text"], "out": "same" },
+  "detect": {
+    "bin": "claude"
+  },
+  "vars": {
+    "lang": "ru"
+  },
+  "io": {
+    "in": [
+      "srt",
+      "text"
+    ],
+    "out": "same"
+  },
   "run": "claude -p \"Переведи на {lang}. Если это SRT — сохрани нумерацию и тайминги без изменений, переводи только текстовые строки. Верни только результат, без пояснений.\" < {in} > {out}",
   "timeout_s": 900,
   "window_h": 5,
-  "quota_patterns": ["usage limit", "rate limit"],
-  "notes": "подписка Max, без API-ключа. тайминги не трогает. на длинных сабах может упереться в окно — тогда режь вход. window_h=5 — скользящее окно подписки Anthropic; soft_cap не задан намеренно: точный лимит вызовов неизвестен, исчерпание ловится по quota_patterns из stderr"
+  "quota_patterns": [
+    "usage limit",
+    "rate limit"
+  ],
+  "notes": {
+    "en": "Max subscription, no API key. Keeps timings untouched. Long subtitle files may hit the window — split the input then. window_h=5 is the Anthropic rolling window; soft_cap is unset on purpose: the exact call limit is unknown and exhaustion is caught by quota_patterns from stderr",
+    "ru": "подписка Max, без API-ключа. тайминги не трогает. на длинных сабах может упереться в окно — тогда режь вход. window_h=5 — скользящее окно подписки Anthropic; soft_cap не задан намеренно: точный лимит вызовов неизвестен, исчерпание ловится по quota_patterns из stderr"
+  }
 }

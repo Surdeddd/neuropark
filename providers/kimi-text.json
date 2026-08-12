@@ -3,11 +3,29 @@
   "capability": "text",
   "kind": "agent",
   "rank": 5,
-  "detect": { "bin": "kimi" },
-  "io": { "in": ["text"], "out": "text" },
+  "detect": {
+    "bin": "kimi"
+  },
+  "io": {
+    "in": [
+      "text"
+    ],
+    "out": "text"
+  },
   "run": "kimi -p \"$(cat {prompt_file})\" --output-format text > {out}",
   "timeout_s": 1800,
-  "quota_patterns": ["usage limit", "rate limit", "quota", "too many requests"],
-  "roles": ["frontend", "review"],
-  "notes": "дешёвый второй проход и фронтенд. window_h не задан: лимиты подписки не выяснены, исчерпание ловится по stderr"
+  "quota_patterns": [
+    "usage limit",
+    "rate limit",
+    "quota",
+    "too many requests"
+  ],
+  "roles": [
+    "frontend",
+    "review"
+  ],
+  "notes": {
+    "en": "cheap second pass and frontend work. window_h unset: subscription limits are unverified, exhaustion is caught from stderr",
+    "ru": "дешёвый второй проход и фронтенд. window_h не задан: лимиты подписки не выяснены, исчерпание ловится по stderr"
+  }
 }

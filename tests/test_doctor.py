@@ -2,6 +2,7 @@ from nn.catalog import Catalog
 from nn.doctor import check
 from nn.model import Bridge, Capability, Host, Provider
 from nn.registry import Entry, Registry
+from nn.runlog import RunRecord
 
 LOCAL = Host(id="local", kind="local")
 
@@ -87,8 +88,31 @@ def test_reports_stale():
     assert any("stale" in f.message for f in findings)
 
 
-def test_reports_never_used_provider():
+def other_run(provider: str = "кто-то-другой") -> RunRecord:
+    return RunRecord(
+        ts="2026-08-12T10:00:00+00:00",
+        run_id="r",
+        provider=provider,
+        capability="text",
+        host="local",
+        in_type="text",
+        out=None,
+        exit_code=0,
+        outcome="success",
+        ms=10,
+        stderr_tail="",
+    )
+
+
+def test_never_used_provider_is_silent_on_fresh_install():
+    """На свежей установке «ни разу не запускался» — норма, а не находка."""
     findings = check(cat([prov()]), reg({"p": "ok"}), runs=[])
+    assert not any("ни разу не запускался" in f.message for f in findings)
+
+
+def test_reports_never_used_provider_on_settled_install():
+    history = [other_run() for _ in range(10)]
+    findings = check(cat([prov()]), reg({"p": "ok"}), runs=history)
     assert any("ни разу не запускался" in f.message for f in findings)
 
 

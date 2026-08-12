@@ -67,6 +67,21 @@ def test_secrets_are_declared_as_file_references_only():
             assert value.startswith("@file:"), f"{host.id}.{key} — секрет в открытом виде"
 
 
+def test_all_provider_notes_are_bilingual():
+    """Заметки — текст для человека, значит обязаны быть на двух языках."""
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1] / "providers"
+    monolingual = []
+    for path in sorted(root.glob("*.json")):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        notes = payload.get("notes")
+        if not isinstance(notes, dict) or not notes.get("en") or not notes.get("ru"):
+            monolingual.append(path.name)
+    assert monolingual == []
+
+
 def test_bridges_declare_out_ext_and_detect():
     catalog = load_catalog()
     assert catalog.bridges

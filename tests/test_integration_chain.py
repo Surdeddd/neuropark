@@ -75,9 +75,7 @@ def fake_root(monkeypatch, tmp_path):
     for sub in ("providers", "hosts", "recipes", "bridges"):
         (data / sub).mkdir(parents=True)
     for pid, payload in FAKE_PROVIDERS.items():
-        (data / "providers" / f"{pid}.json").write_text(
-            json.dumps(payload), encoding="utf-8"
-        )
+        (data / "providers" / f"{pid}.json").write_text(json.dumps(payload), encoding="utf-8")
     (data / "hosts" / "local.json").write_text(
         json.dumps({"id": "local", "kind": "local"}), encoding="utf-8"
     )

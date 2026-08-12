@@ -62,9 +62,7 @@ def test_timeouts_advise_bigger_timeout():
     records = [rec(outcome="timeout"), rec(outcome="timeout"), rec(outcome="crash", ms=1_000_000)]
     lessons = distill(records, [])
     advice = [
-        lesson
-        for lesson in lessons
-        if lesson.instruction and "timeout_s" in lesson.instruction
+        lesson for lesson in lessons if lesson.instruction and "timeout_s" in lesson.instruction
     ]
     assert advice
     assert "2000" in advice[0].instruction

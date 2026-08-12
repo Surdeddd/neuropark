@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from nn.errors import Exit, NnError
+from nn.i18n import bi
 from nn.model import Bridge, Capability, Host, Provider, Recipe, Role, RolesConfig, Step
 
 KINDS = {"model", "tool", "agent"}
@@ -26,6 +27,20 @@ def _templates(raw: Any, source: str, field: str) -> dict[str, str]:
             raise _bad(source, f"{field} (неизвестные ОС: {sorted(unknown)})")
         return {str(k): str(v) for k, v in raw.items()}
     raise _bad(source, field)
+
+
+def _notes(raw: Any, source: str) -> str:
+    """Заметки провайдера. Двуязычная форма {"en": ..., "ru": ...} — предпочтительная."""
+    if isinstance(raw, dict):
+        english = str(raw.get("en") or "")
+        russian = str(raw.get("ru") or "")
+        if not english or not russian:
+            raise _bad(source, "notes (в двуязычной форме нужны оба ключа: en и ru)")
+        return bi(english, russian)
+    text = str(raw or "")
+    if not text:
+        raise _bad(source, "notes (обязательны: скорость, качество, грабли)")
+    return text
 
 
 def parse_provider(raw: dict[str, Any], source: str) -> Provider:
@@ -54,9 +69,7 @@ def parse_provider(raw: dict[str, Any], source: str) -> Provider:
         raise _bad(source, "adapter (взаимоисключающ с run)")
     if not run and not adapter:
         raise _bad(source, "run (обязателен, если нет adapter)")
-    notes = str(raw.get("notes") or "")
-    if not notes:
-        raise _bad(source, "notes (обязательны: скорость, качество, грабли)")
+    notes = _notes(raw.get("notes"), source)
     return Provider(
         id=pid,
         capability=str(raw["capability"]),

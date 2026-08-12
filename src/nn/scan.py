@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 from nn.catalog import Catalog
 from nn.detect import Runner, run_detect, shell_runner
+from nn.i18n import bi
 from nn.model import Host
 from nn.registry import Entry, Registry, hostname
 
@@ -35,7 +36,10 @@ def scan(
         host = catalog.hosts.get(provider.host)
         if host is None:
             entries[provider.id] = Entry(
-                provider.id, provider.host, "missing", f"хост {provider.host} не описан"
+                provider.id,
+                provider.host,
+                "missing",
+                bi(f"host {provider.host} is not described", f"хост {provider.host} не описан"),
             )
             continue
 
@@ -48,7 +52,10 @@ def scan(
                 provider.id,
                 host.id,
                 "stale",
-                f"хост {host.id} недостижим, данные от прошлого скана",
+                bi(
+                    f"host {host.id} unreachable, data from the previous scan",
+                    f"хост {host.id} недостижим, данные от прошлого скана",
+                ),
                 old.version if old else None,
                 old.last_seen if old else None,
             )

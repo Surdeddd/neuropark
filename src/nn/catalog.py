@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Protocol, TypeVar
 
 from nn.errors import Exit, NnError
+from nn.i18n import bi
 from nn.model import Bridge, Capability, Host, Provider, Recipe, RolesConfig
 from nn.paths import data_dir, state_dir
 from nn.schema import (
@@ -71,7 +72,13 @@ def load_catalog(root: Path | None = None) -> Catalog:
     caps, types = parse_capabilities(_read(caps_path))
     hosts = _load_dir(base, "hosts", parse_host)
     if "local" not in hosts:
-        raise NnError(Exit.BAD_DATA, "hosts/local.json отсутствует: нужен хост local")
+        raise NnError(
+            Exit.BAD_DATA,
+            bi(
+                "hosts/local.json is missing: a local host is required",
+                "hosts/local.json отсутствует: нужен хост local",
+            ),
+        )
     return Catalog(
         providers=_load_dir(base, "providers", parse_provider),
         hosts=hosts,

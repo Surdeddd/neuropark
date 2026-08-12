@@ -24,8 +24,6 @@ class WorktreeResult:
 
 
 def _git(args: list[str], *, cwd: Path) -> tuple[int, str, str]:
-    # core.quotePath=false обязателен: иначе git пишет кириллические имена файлов
-    # восьмеричными кодами и патч становится нечитаемым для человека
     done = subprocess.run(
         ["git", "-c", "core.quotePath=false", *args],
         cwd=cwd,

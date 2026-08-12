@@ -4,12 +4,26 @@
   "kind": "model",
   "rank": 6,
   "detect": {
-    "files": ["~/scripts/gen-image.py"],
+    "files": [
+      "~/scripts/gen-image.py"
+    ],
     "bin": "grok"
   },
-  "io": { "in": ["text"], "out": "image" },
+  "io": {
+    "in": [
+      "text"
+    ],
+    "out": "image"
+  },
   "run": "python3 ~/scripts/gen-image.py generate --provider grok --prompt \"$(cat {in})\" --out {out}",
   "timeout_s": 600,
-  "quota_patterns": ["usage limit", "rate limit", "quota"],
-  "notes": "Grok Imagine: быстрее и вольнее по стилю, слабее по тексту в кадре. window_h намеренно НЕ задан: длина окна SuperGrok не выяснена, а выдумывать число значит врать в отчётах nn quota. Прописать по факту первого срабатывания quota_patterns"
+  "quota_patterns": [
+    "usage limit",
+    "rate limit",
+    "quota"
+  ],
+  "notes": {
+    "en": "Grok Imagine: faster and looser on style, weaker on text inside the frame. window_h is deliberately unset: the SuperGrok window length is unverified and a made-up number would lie in nn quota reports",
+    "ru": "Grok Imagine: быстрее и вольнее по стилю, слабее по тексту в кадре. window_h намеренно НЕ задан: длина окна SuperGrok не выяснена, а выдумывать число значит врать в отчётах nn quota. Прописать по факту первого срабатывания quota_patterns"
+  }
 }

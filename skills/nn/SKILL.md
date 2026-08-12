@@ -1,9 +1,11 @@
 ---
 name: nn
-description: Каталог всех нейронок пользователя и единый контракт их вызова. Зови когда нужно (1) выяснить, чем сделать задачу — «чем транскрибировать», «что у меня есть для картинок», «какой моделью озвучить», «что стоит на winpc»; (2) выполнить медиа-операцию — транскрипт, озвучка, генерация картинки, эмбеддинг, чистка звука, вжигание сабов, подмена звуковой дорожки; (3) связать несколько нейронок в цепочку; (4) провести задачу через несколько моделей с кросс-ревью. Триггеры — nn, «парк нейронок», «чем это сделать», «какие у меня модели», транскрибируй, озвучь, сгенери картинку, сделай сабы, «сколько квоты осталось».
+description: Catalog of every neural tool the user owns plus a single calling contract. Русский и английский. Call it to (1) find out what can do a job — "what can transcribe this", "what do I have for images", "which model for voice", "what runs on winpc", «чем транскрибировать», «что у меня есть для картинок», «какой моделью озвучить»; (2) perform a media operation — transcript, voiceover, image generation, embedding, audio cleanup, burning subtitles, swapping an audio track, транскрипт, озвучка, генерация картинки, эмбеддинг, чистка звука, вжигание сабов; (3) chain several tools together / связать нейронки в цепочку; (4) drive a task through several models with cross-review / прогнать задачу через несколько моделей с кросс-ревью. Triggers — nn, neural park, "what can do this", "which models do I have", transcribe, voice over, generate image, make subtitles, how much quota is left, «парк нейронок», «чем это сделать», «какие у меня модели», транскрибируй, озвучь, сгенери картинку, сделай сабы, «сколько квоты осталось».
 ---
 
-# nn — парк нейронок
+# nn — парк нейронок / neural park
+
+Язык вывода переключается `NN_LANG=ru` или `NN_LANG=en`. Output language switches with `NN_LANG`.
 
 `nn` знает всё, что у пользователя есть из нейронок на всех машинах, и умеет их запускать по единому контракту. Бинарь — `bin/nn` в корне плагина (или `nn`, если он в PATH).
 

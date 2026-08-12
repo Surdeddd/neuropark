@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from nn.i18n import bi
+
 EXTRA_BIN_DIRS = (
     "~/.local/bin",
     "/opt/homebrew/bin",
@@ -24,7 +26,7 @@ class Runner(Protocol):
 
 def shell_runner(command: str, *, timeout: float) -> tuple[int, str, str]:
     try:
-        done = subprocess.run(  # noqa: S602 — команда собрана из наших же данных
+        done = subprocess.run(  # noqa: S602
             command,
             shell=True,
             capture_output=True,
@@ -75,55 +77,87 @@ def run_detect(
     environ = os.environ if env is None else env
     for key in requires_key:
         if not environ.get(key):
-            return DetectResult("needs-key", f"нет переменной окружения {key}")
+            return DetectResult(
+                "needs-key", bi(f"env variable {key} is not set", f"нет переменной окружения {key}")
+            )
     if not spec:
-        return DetectResult("missing", "пустой detect")
+        return DetectResult("missing", bi("empty detect", "пустой detect"))
 
     name = spec.get("bin")
     if name and which(str(name)) is None:
-        return DetectResult("missing", f"бинарь {name} не найден")
+        return DetectResult("missing", bi(f"binary {name} not found", f"бинарь {name} не найден"))
 
     for raw in spec.get("files") or ():
         path = Path(str(raw)).expanduser()
         if not path.exists():
-            return DetectResult("missing", f"файл {path} отсутствует")
+            return DetectResult(
+                "missing", bi(f"file {path} is missing", f"файл {path} отсутствует")
+            )
 
     for pattern in spec.get("glob") or ():
         if not _glob_matches(str(pattern)):
-            return DetectResult("missing", f"шаблон {pattern} не дал совпадений")
+            return DetectResult(
+                "missing",
+                bi(f"pattern {pattern} matched nothing", f"шаблон {pattern} не дал совпадений"),
+            )
 
     for key in spec.get("env") or ():
         if not environ.get(str(key)):
-            return DetectResult("missing", f"переменная окружения {key} пуста")
+            return DetectResult(
+                "missing", bi(f"env variable {key} is empty", f"переменная окружения {key} пуста")
+            )
 
     url = spec.get("http")
     if url:
         code, _, _ = runner(f"curl -fsS -m 3 -o /dev/null {url}", timeout=5)
         if code != 0:
-            return DetectResult("missing", f"эндпоинт {url} не ответил")
+            return DetectResult(
+                "missing", bi(f"endpoint {url} did not answer", f"эндпоинт {url} не ответил")
+            )
 
     module = spec.get("python")
     if module:
         code, _, _ = runner(f'python3 -c "import {module}"', timeout=15)
         if code != 0:
-            return DetectResult("missing", f"python-модуль {module} не импортируется")
+            return DetectResult(
+                "missing",
+                bi(
+                    f"python module {module} does not import",
+                    f"python-модуль {module} не импортируется",
+                ),
+            )
 
     package = spec.get("npm")
     if package:
         code, out, _ = runner("npm ls -g --depth=0 --parseable", timeout=30)
         if code != 0 or str(package) not in out:
-            return DetectResult("missing", f"npm-пакет {package} не установлен глобально")
+            return DetectResult(
+                "missing",
+                bi(
+                    f"npm package {package} is not installed globally",
+                    f"npm-пакет {package} не установлен глобально",
+                ),
+            )
 
     image = spec.get("docker")
     if image:
         code, out, _ = runner("docker images --format '{{.Repository}}:{{.Tag}}'", timeout=15)
         if code != 0 or str(image) not in out:
-            return DetectResult("missing", f"docker-образ {image} отсутствует")
+            return DetectResult(
+                "missing",
+                bi(f"docker image {image} is missing", f"docker-образ {image} отсутствует"),
+            )
 
     formula = spec.get("brew")
     if formula:
         code, out, _ = runner("brew list --formula -1", timeout=30)
         if code != 0 or str(formula) not in out.split():
-            return DetectResult("missing", f"формула brew {formula} не установлена")
+            return DetectResult(
+                "missing",
+                bi(
+                    f"brew formula {formula} is not installed",
+                    f"формула brew {formula} не установлена",
+                ),
+            )
 
     return DetectResult("ok", "")

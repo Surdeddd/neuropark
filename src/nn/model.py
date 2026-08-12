@@ -14,8 +14,6 @@ class Provider:
     io_out: str
     notes: str
     source: str
-    # чем провайдер реально пишет файл, если это не первое расширение класса типа
-    # (ben-voice всегда кодирует opus, поэтому у него out_ext=ogg при out=audio)
     out_ext: str | None = None
     host: str = "local"
     rank: int = 0
@@ -31,8 +29,6 @@ class Provider:
     quota_patterns: tuple[str, ...] = ()
     requires_key: tuple[str, ...] = ()
     roles: tuple[str, ...] = ()
-    # вендор нужен оркестрации: ревью патча обязано идти другим вендором,
-    # иначе модель проверяет саму себя. По умолчанию — префикс id до первого дефиса
     vendor: str | None = None
 
     @property

@@ -4,9 +4,19 @@
   "kind": "model",
   "host": "winpc",
   "rank": 9,
-  "detect": { "http": "http://127.0.0.1:8188/system_stats" },
-  "io": { "in": ["text"], "out": "image" },
+  "detect": {
+    "http": "http://127.0.0.1:8188/system_stats"
+  },
+  "io": {
+    "in": [
+      "text"
+    ],
+    "out": "image"
+  },
   "run": "python D:/ofm/scripts/run_workflow.py --workflow zimage_realism_v35 --prompt \"$(cat {in})\" --out {out}",
   "timeout_s": 1800,
-  "notes": "Z-Image realism V3.5 на 5090, лучший фотореализм из парка. host auto=false — nn печатает ssh-команду, сам не жмёт"
+  "notes": {
+    "en": "Z-Image realism V3.5 on a 5090, the best photorealism in the park. host auto=false, so nn prints the ssh command instead of running it",
+    "ru": "Z-Image realism V3.5 на 5090, лучший фотореализм из парка. host auto=false — nn печатает ssh-команду, сам не жмёт"
+  }
 }

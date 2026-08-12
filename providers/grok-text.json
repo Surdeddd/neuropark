@@ -3,11 +3,29 @@
   "capability": "text",
   "kind": "agent",
   "rank": 6,
-  "detect": { "bin": "grok" },
-  "io": { "in": ["text"], "out": "text" },
+  "detect": {
+    "bin": "grok"
+  },
+  "io": {
+    "in": [
+      "text"
+    ],
+    "out": "text"
+  },
   "run": "grok --prompt-file {prompt_file} --output-format text > {out}",
   "timeout_s": 1800,
-  "quota_patterns": ["usage limit", "rate limit", "quota", "too many requests"],
-  "roles": ["mechanics", "scout"],
-  "notes": "локальный Grok Build CLI, умеет --prompt-file. первый помощник по правилам симбиоза: механика и разведка по репозиторию. window_h не задан — длина окна SuperGrok не выяснена"
+  "quota_patterns": [
+    "usage limit",
+    "rate limit",
+    "quota",
+    "too many requests"
+  ],
+  "roles": [
+    "mechanics",
+    "scout"
+  ],
+  "notes": {
+    "en": "local Grok Build CLI, supports --prompt-file. First helper by the symbiosis rules: mechanics and repository scouting. window_h unset — SuperGrok window length is unverified",
+    "ru": "локальный Grok Build CLI, умеет --prompt-file. первый помощник по правилам симбиоза: механика и разведка по репозиторию. window_h не задан — длина окна SuperGrok не выяснена"
+  }
 }

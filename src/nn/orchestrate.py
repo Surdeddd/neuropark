@@ -8,6 +8,7 @@ from pathlib import Path
 
 from nn.catalog import Catalog
 from nn.errors import Exit, NnError
+from nn.i18n import bi
 from nn.model import Role
 from nn.paths import state_dir
 from nn.registry import Registry
@@ -15,7 +16,6 @@ from nn.resolve import Choice, resolve_role
 from nn.run import Envelope, execute
 from nn.worktree import create, finish
 
-# Стадия → роль. Соответствие жёсткое и однозначное, чтобы маршрут был предсказуем.
 STAGE_ROLES = {
     "spec": "spec",
     "work": "mechanics",
@@ -67,7 +67,6 @@ def _prompt_for(stage: str, task: str, spec: str, patches: list[str], reviews: l
             " критерий готовности. Без реализации, без кода."
         )
     if stage == "work":
-        # рабочий каталог провайдера — изолированный worktree, оригинал не тронут
         return (
             f"{head}{spec_block}\n\n"
             "Реализуй это в текущем рабочем каталоге: меняй файлы напрямую."
@@ -100,14 +99,10 @@ def _work_stage(
     exhausted: frozenset[str],
     now: datetime,
 ) -> StageResult:
-    choice = resolve_role(
-        role_name, catalog=catalog, registry=registry, exhausted=exhausted
-    )
+    choice = resolve_role(role_name, catalog=catalog, registry=registry, exhausted=exhausted)
     run_id = f"{int(now.timestamp())}-orch{run_index}-{choice.provider.id}"
     if not role.worktree:
-        envelope = execute(
-            choice, catalog=catalog, prompt=prompt, work_dir=str(repo), now=now
-        )
+        envelope = execute(choice, catalog=catalog, prompt=prompt, work_dir=str(repo), now=now)
         return StageResult(
             stage="work",
             role=role_name,
@@ -118,12 +113,9 @@ def _work_stage(
 
     worktree = create(repo, run_id)
     try:
-        envelope = execute(
-            choice, catalog=catalog, prompt=prompt, work_dir=str(worktree), now=now
-        )
+        envelope = execute(choice, catalog=catalog, prompt=prompt, work_dir=str(worktree), now=now)
         result = finish(repo, worktree, run_id)
     except BaseException:
-        # даже при падении провайдера worktree убираем, чтобы не копить мусор в стейте
         finish(repo, worktree, run_id)
         raise
     patch = str(result.patch) if result.patch else None
@@ -188,7 +180,6 @@ def orchestrate(
                     patches.append(Path(item.patch).read_text(encoding="utf-8", errors="replace"))
             continue
 
-        # ревью обязано идти другим вендором, чем автор патча
         exclude = frozenset(authors) if stage == "cross-review" else frozenset()
         choice: Choice = resolve_role(
             role_name,
@@ -197,9 +188,7 @@ def orchestrate(
             exclude_vendors=exclude,
             exhausted=exhausted,
         )
-        envelope = execute(
-            choice, catalog=catalog, prompt=prompt, work_dir=str(repo), now=moment
-        )
+        envelope = execute(choice, catalog=catalog, prompt=prompt, work_dir=str(repo), now=moment)
         text = _read_output(envelope)
         results.append(
             StageResult(
@@ -219,14 +208,19 @@ def orchestrate(
 
 
 def report(results: list[StageResult]) -> str:
-    lines = ["# отчёт оркестрации", ""]
+    role_word = bi("role", "роль")
+    outcome_word = bi("outcome", "исход")
+    patch_word = bi("patch", "патч")
+    not_applied = bi("NOT applied, merge is yours", "НЕ применён, мерж твой")
+
+    lines = [bi("# Orchestration report", "# Отчёт оркестрации"), ""]
     for item in results:
-        lines.append(f"## {item.stage} — {item.provider} (роль {item.role})")
-        lines.append(f"исход: {item.envelope.outcome}")
+        lines.append(f"## {item.stage} — {item.provider} ({role_word} {item.role})")
+        lines.append(f"{outcome_word}: {item.envelope.outcome}")
         if item.patch:
-            lines.append(f"патч: {item.patch} (НЕ применён — мерж твой)")
+            lines.append(f"{patch_word}: {item.patch} ({not_applied})")
         lines.append("")
-        lines.append(item.text.strip() or "(пусто)")
+        lines.append(item.text.strip() or bi("(empty)", "(пусто)"))
         lines.append("")
     return "\n".join(lines)
 

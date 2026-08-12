@@ -1,19 +1,49 @@
 from __future__ import annotations
 
 from nn.catalog import Catalog
+from nn.i18n import bi
 from nn.registry import Registry
 from nn.resolve import Choice
 from nn.runlog import RunRecord
 
-LS_HEADERS = ["capability", "провайдер", "хост", "статус", "версия", "видели", "заметки"]
-WHY_HEADERS = ["провайдер", "хост", "решение", "причина"]
-STATS_HEADERS = ["провайдер", "вызовов", "успехов", "доля", "последний"]
-DOCTOR_HEADERS = ["уровень", "объект", "что не так"]
+LS_HEADERS = [
+    "capability",
+    bi("provider", "провайдер"),
+    bi("host", "хост"),
+    bi("status", "статус"),
+    bi("version", "версия"),
+    bi("seen", "видели"),
+    bi("notes", "заметки"),
+]
+WHY_HEADERS = [
+    bi("provider", "провайдер"),
+    bi("host", "хост"),
+    bi("decision", "решение"),
+    bi("reason", "причина"),
+]
+STATS_HEADERS = [
+    bi("provider", "провайдер"),
+    bi("calls", "вызовов"),
+    bi("wins", "успехов"),
+    bi("rate", "доля"),
+    bi("last", "последний"),
+]
+DOCTOR_HEADERS = [bi("level", "уровень"), bi("subject", "объект"), bi("problem", "что не так")]
+QUOTA_HEADERS = [
+    bi("provider", "провайдер"),
+    bi("window", "окно"),
+    bi("burned", "сожжено"),
+    bi("state", "состояние"),
+    bi("closes", "закроется"),
+]
+BURN_HEADERS = [bi("window", "окно"), "capability", bi("input", "вход"), bi("closes", "закроется")]
+RECIPE_HEADERS = [bi("recipe", "рецепт"), bi("description", "описание"), bi("steps", "шаги")]
+ROLE_HEADERS = [bi("role", "роль"), bi("provider chain", "цепочка провайдеров"), "worktree"]
 
 
 def table(rows: list[list[str]], headers: list[str]) -> str:
     if not rows:
-        return "(пусто)"
+        return bi("(empty)", "(пусто)")
     grid = [headers, *rows]
     widths = [max(len(str(row[i])) for row in grid) for i in range(len(headers))]
     lines = [
@@ -30,9 +60,7 @@ def ls_rows(
     catalog: Catalog, registry: Registry, *, capability: str | None = None
 ) -> list[list[str]]:
     rows: list[list[str]] = []
-    for provider in sorted(
-        catalog.providers.values(), key=lambda p: (p.capability, -p.rank, p.id)
-    ):
+    for provider in sorted(catalog.providers.values(), key=lambda p: (p.capability, -p.rank, p.id)):
         if capability and provider.capability != capability:
             continue
         entry = registry.get(provider.id)
@@ -41,7 +69,7 @@ def ls_rows(
                 provider.capability,
                 provider.id,
                 provider.host,
-                entry.status if entry else "не сканировался",
+                entry.status if entry else bi("not scanned", "не сканировался"),
                 (entry.version or "-") if entry else "-",
                 (entry.last_seen or "-")[:10] if entry else "-",
                 provider.notes[:60],
@@ -51,12 +79,28 @@ def ls_rows(
 
 
 def why_rows(choice: Choice) -> list[list[str]]:
-    rows = [[choice.provider.id, choice.host.id, "выбран", f"rank={choice.provider.rank}"]]
+    rows = [
+        [choice.provider.id, choice.host.id, bi("chosen", "выбран"), f"rank={choice.provider.rank}"]
+    ]
     if choice.bridge:
-        rows.append([choice.bridge.id, "-", "мостик", f"{choice.bridge.frm}→{choice.bridge.to}"])
+        rows.append(
+            [
+                choice.bridge.id,
+                "-",
+                bi("bridge", "мостик"),
+                f"{choice.bridge.frm}→{choice.bridge.to}",
+            ]
+        )
     if choice.manual:
-        rows.append([choice.host.id, "-", "ручной", "хост auto=false — команда печатается"])
-    rows.extend([[r.provider, "-", "отклонён", r.reason] for r in choice.rejected])
+        rows.append(
+            [
+                choice.host.id,
+                "-",
+                bi("manual", "ручной"),
+                bi("host auto=false, command is printed", "команда печатается"),
+            ]
+        )
+    rows.extend([[r.provider, "-", bi("rejected", "отклонён"), r.reason] for r in choice.rejected])
     return rows
 
 

@@ -63,7 +63,6 @@ def build(catalog: Catalog, registry: Registry) -> AdaptResult:
     roles: dict[str, RolePlan] = {}
 
     for role in ROLE_ORDER:
-        # сначала те, кто сам назвался на эту роль в манифесте, потом остальные по rank
         hinted = [pid for pid in ranked if role in catalog.providers[pid].roles]
         chain = tuple(hinted + [pid for pid in ranked if pid not in hinted])
         if not chain:
@@ -75,7 +74,5 @@ def build(catalog: Catalog, registry: Registry) -> AdaptResult:
 
 def write(result: AdaptResult) -> Path:
     path = state_dir() / "roles.json"
-    path.write_text(
-        json.dumps(result.to_payload(), ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    path.write_text(json.dumps(result.to_payload(), ensure_ascii=False, indent=2), encoding="utf-8")
     return path

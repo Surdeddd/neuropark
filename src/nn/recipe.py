@@ -54,9 +54,14 @@ def run_recipe(
     input_path: str,
     work_dir: str | None = None,
     now: datetime | None = None,
+    exhausted: frozenset[str] = frozenset(),
 ) -> list[StepResult]:
+    """Шаги по порядку. Поле on_quota рецепта решает, что делать с исчерпанным окном:
+    fail (по умолчанию) — цепочка падает кодом 6, fallback — разрешён переход
+    на следующего провайдера, потому что рецепт объявил это заранее."""
     done: list[StepResult] = []
     current = input_path
+    allow_fallback = recipe.on_quota == "fallback"
 
     for index, step in enumerate(recipe.steps):
         source = (
@@ -74,6 +79,8 @@ def run_recipe(
             registry=registry,
             in_type=type_of(source, catalog.types),
             pin=step.provider,
+            exhausted=exhausted,
+            allow_fallback=allow_fallback,
             last_success=last_success_map(),
         )
         envelope = execute(

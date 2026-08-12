@@ -3,9 +3,19 @@
   "capability": "compose",
   "kind": "tool",
   "rank": 10,
-  "detect": { "bin": "ffmpeg" },
-  "io": { "in": ["video"], "out": "video" },
+  "detect": {
+    "bin": "ffmpeg"
+  },
+  "io": {
+    "in": [
+      "video"
+    ],
+    "out": "video"
+  },
   "run": "ffmpeg -nostdin -y -i {in} -i {extra0} -c:v copy -map 0:v:0 -map 1:a:0 -shortest {out}",
   "timeout_s": 1800,
-  "notes": "подмена звуковой дорожки: видео из основного входа, звук из --extra, видеопоток не перекодируется"
+  "notes": {
+    "en": "audio track replacement: video from the main input, sound from --extra, video stream is copied without re-encoding",
+    "ru": "подмена звуковой дорожки: видео из основного входа, звук из --extra, видеопоток не перекодируется"
+  }
 }

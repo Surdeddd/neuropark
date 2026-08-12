@@ -8,6 +8,7 @@ from nn.bridge import find_bridge
 from nn.catalog import Catalog
 from nn.detect import Runner, shell_runner
 from nn.errors import Exit, NnError
+from nn.i18n import bi
 from nn.iotypes import accepts, output_type
 from nn.model import Bridge, Host, Provider
 from nn.registry import Registry
@@ -78,25 +79,44 @@ def resolve_role(
     for provider_id in role.providers:
         provider = catalog.providers.get(provider_id)
         if provider is None:
-            rejected.append(Rejection(provider_id, "нет такого манифеста"))
+            rejected.append(Rejection(provider_id, bi("no such manifest", "нет такого манифеста")))
             continue
         if provider.vendor_name in exclude_vendors:
-            rejected.append(Rejection(provider_id, f"вендор {provider.vendor_name} исключён"))
+            rejected.append(
+                Rejection(
+                    provider_id,
+                    bi(
+                        f"vendor {provider.vendor_name} is excluded",
+                        f"вендор {provider.vendor_name} исключён",
+                    ),
+                )
+            )
             continue
         if provider_id in exhausted:
-            rejected.append(Rejection(provider_id, "окно квоты исчерпано"))
+            rejected.append(
+                Rejection(provider_id, bi("quota window exhausted", "окно квоты исчерпано"))
+            )
             continue
         host = catalog.hosts.get(provider.host)
         if host is None:
-            rejected.append(Rejection(provider_id, f"хост {provider.host} не описан"))
+            rejected.append(
+                Rejection(
+                    provider_id,
+                    bi(f"host {provider.host} is not described", f"хост {provider.host} не описан"),
+                )
+            )
             continue
         entry = registry.get(provider_id)
         if entry is None or entry.status != "ok":
             status = entry.status if entry else "нет в реестре"
-            rejected.append(Rejection(provider_id, f"статус: {status}"))
+            rejected.append(Rejection(provider_id, bi(f"status: {status}", f"статус: {status}")))
             continue
         if not provider.adapter and pick(provider.run, system=system) is None:
-            rejected.append(Rejection(provider_id, "нет шаблона run под текущую ОС"))
+            rejected.append(
+                Rejection(
+                    provider_id, bi("no run template for this OS", "нет шаблона run под текущую ОС")
+                )
+            )
             continue
         return Choice(
             provider=provider,
@@ -142,19 +162,39 @@ def resolve(
     for provider in sorted(pool, key=lambda p: p.id):
         host = catalog.hosts.get(provider.host)
         if host is None:
-            rejected.append(Rejection(provider.id, f"хост {provider.host} не описан"))
+            rejected.append(
+                Rejection(
+                    provider.id,
+                    bi(f"host {provider.host} is not described", f"хост {provider.host} не описан"),
+                )
+            )
             continue
         entry = registry.get(provider.id)
         if entry is None:
-            rejected.append(Rejection(provider.id, "нет в реестре — сделай nn scan"))
+            rejected.append(
+                Rejection(
+                    provider.id,
+                    bi("absent from registry, run nn scan", "нет в реестре — сделай nn scan"),
+                )
+            )
             continue
         if entry.status != "ok":
             rejected.append(
-                Rejection(provider.id, f"статус в реестре: {entry.status} ({entry.reason})")
+                Rejection(
+                    provider.id,
+                    bi(
+                        f"registry status: {entry.status} ({entry.reason})",
+                        f"статус в реестре: {entry.status} ({entry.reason})",
+                    ),
+                )
             )
             continue
         if not provider.adapter and pick(provider.run, system=system) is None:
-            rejected.append(Rejection(provider.id, "нет шаблона run под текущую ОС"))
+            rejected.append(
+                Rejection(
+                    provider.id, bi("no run template for this OS", "нет шаблона run под текущую ОС")
+                )
+            )
             continue
         bridge: Bridge | None = None
         if in_type is not None and not accepts(provider.io_in, in_type):
@@ -163,7 +203,10 @@ def resolve(
                 rejected.append(
                     Rejection(
                         provider.id,
-                        f"принимает {list(provider.io_in)}, вход {in_type}, мостика нет",
+                        bi(
+                            f"accepts {list(provider.io_in)}, input is {in_type}, no bridge",
+                            f"принимает {list(provider.io_in)}, вход {in_type}, мостика нет",
+                        ),
                     )
                 )
                 continue
@@ -179,16 +222,21 @@ def resolve(
 
     ranked = sorted(candidates, key=lambda item: _sort_key(item[0], item[1], recent))
 
-    # Квота проверяется ПОСЛЕ ранжирования и намеренно не фильтрует кандидатов заранее:
-    # если победитель исчерпал окно, мы обязаны отказаться и назвать альтернативу,
-    # а не тихо подсунуть другую модель. Переключение — только по явному allow_fallback.
     if exhausted:
         if allow_fallback:
             fresh = [item for item in ranked if item[0].id not in exhausted]
             for item in ranked:
                 if item[0].id in exhausted:
                     quota_blocked.append(item[0].id)
-                    rejected.append(Rejection(item[0].id, "окно квоты исчерпано, взят следующий"))
+                    rejected.append(
+                        Rejection(
+                            item[0].id,
+                            bi(
+                                "quota window exhausted, next one taken",
+                                "окно квоты исчерпано, взят следующий",
+                            ),
+                        )
+                    )
             if not fresh:
                 raise NnError(
                     Exit.QUOTA,
@@ -198,9 +246,7 @@ def resolve(
         elif ranked[0][0].id in exhausted:
             spare = [item[0].id for item in ranked[1:] if item[0].id not in exhausted]
             hint = (
-                f"живая альтернатива: {spare[0]}, повтори с --fallback"
-                if spare
-                else "замены нет"
+                f"живая альтернатива: {spare[0]}, повтори с --fallback" if spare else "замены нет"
             )
             raise NnError(
                 Exit.QUOTA,

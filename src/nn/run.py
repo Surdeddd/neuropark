@@ -40,8 +40,6 @@ class Envelope:
     command: str | None = None
 
     def to_json(self) -> str:
-        # в JSON ключ зовётся "in" (как в спеке), в питоне это ключевое слово,
-        # поэтому поле называется in_path и переименовывается только на выходе
         payload = asdict(self)
         payload["in"] = payload.pop("in_path")
         return json.dumps(payload, ensure_ascii=False, indent=2)
@@ -100,8 +98,6 @@ def execute(
     if prompt is not None:
         body = prompt
         if with_dossier:
-            # накопленные уроки по этому провайдеру идут в промпт первыми:
-            # досье заполняется само из runs.jsonl, засевать руками не нужно
             advice = instructions_for(provider.id)
             if advice:
                 body = f"Учти известные грабли этого инструмента:\n{advice}\n\n{prompt}"
@@ -243,8 +239,6 @@ def _envelope(
         command=result.command or None,
     )
     if outcome == "manual":
-        # ничего не запускалось — в журнал исходов такое не пишем,
-        # иначе в runs.jsonl появится седьмой класс, которого нет в спеке
         return env
     append(
         RunRecord(

@@ -66,9 +66,7 @@ def test_exhausted_window_is_not_candidate():
 def test_window_closing_soon_with_room_is_candidate():
     started = NOW - timedelta(hours=4, minutes=30)  # окно 5ч закроется через 30 минут
     windows = {
-        "gen": Window(
-            provider="gen", window_h=5, soft_cap=10, calls=1, window_started=started
-        )
+        "gen": Window(provider="gen", window_h=5, soft_cap=10, calls=1, window_started=started)
     }
     assert [w.provider for w in idle_windows(windows, now=NOW)] == ["gen"]
 
@@ -76,9 +74,7 @@ def test_window_closing_soon_with_room_is_candidate():
 def test_window_with_time_left_is_not_urgent():
     started = NOW - timedelta(hours=1)
     windows = {
-        "gen": Window(
-            provider="gen", window_h=5, soft_cap=10, calls=1, window_started=started
-        )
+        "gen": Window(provider="gen", window_h=5, soft_cap=10, calls=1, window_started=started)
     }
     assert idle_windows(windows, now=NOW) == []
 

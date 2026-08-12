@@ -5,12 +5,24 @@
   "rank": 8,
   "detect": {
     "bin": "whisper-cli",
-    "files": ["~/.local/share/whisper/ggml-large-v3-turbo-q5_0.bin"]
+    "files": [
+      "~/.local/share/whisper/ggml-large-v3-turbo-q5_0.bin"
+    ]
   },
-  "vars": { "model": "~/.local/share/whisper/ggml-large-v3-turbo-q5_0.bin" },
-  "io": { "in": ["audio"], "out": "srt" },
+  "vars": {
+    "model": "~/.local/share/whisper/ggml-large-v3-turbo-q5_0.bin"
+  },
+  "io": {
+    "in": [
+      "audio"
+    ],
+    "out": "srt"
+  },
   "pre": "ffmpeg -nostdin -y -i {in} -ar 16000 -ac 1 {tmp}.wav",
   "run": "whisper-cli -m {model} -f {tmp}.wav -osrt -of {out_base} -l auto",
   "timeout_s": 1800,
-  "notes": "быстрый дефолт для черновых сабов, качество чуть ниже large-v3"
+  "notes": {
+    "en": "fast default for draft subtitles, slightly lower quality than large-v3",
+    "ru": "быстрый дефолт для черновых сабов, качество чуть ниже large-v3"
+  }
 }

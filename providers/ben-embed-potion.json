@@ -4,11 +4,21 @@
   "kind": "model",
   "rank": 10,
   "detect": {
-    "files": ["~/scripts/ben-embed.py"],
+    "files": [
+      "~/scripts/ben-embed.py"
+    ],
     "bin": "jq"
   },
-  "io": { "in": ["text"], "out": "json" },
+  "io": {
+    "in": [
+      "text"
+    ],
+    "out": "json"
+  },
   "run": "jq -Rs '[.]' {in} | python3 ~/scripts/ben-embed.py > {out}",
   "timeout_s": 300,
-  "notes": "potion-multilingual-128M, офлайн. контракт: stdin — JSON-массив строк, stdout — массив векторов"
+  "notes": {
+    "en": "potion-multilingual-128M, offline. Contract: stdin is a JSON array of strings, stdout is an array of vectors",
+    "ru": "potion-multilingual-128M, офлайн. контракт: stdin — JSON-массив строк, stdout — массив векторов"
+  }
 }

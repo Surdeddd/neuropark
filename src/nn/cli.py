@@ -11,6 +11,7 @@ from nn.catalog import Catalog, load_catalog
 from nn.dossier import learn, pending_count, should_auto_learn
 from nn.drift import compare, format_drift
 from nn.errors import Exit, NnError
+from nn.i18n import bi
 from nn.iotypes import check_extra, type_of
 from nn.paths import state_dir
 from nn.quota import compute, exhausted_set
@@ -25,21 +26,30 @@ VERSION = "0.6.0"
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="nn", description="каталог парка нейронок")
+    parser = argparse.ArgumentParser(
+        prog="nn",
+        description=bi("Neural park catalog", "каталог парка нейронок"),
+    )
     parser.add_argument("--version", action="version", version=f"nn {VERSION}")
-    parser.add_argument("--json", action="store_true", help="машинный вывод")
+    parser.add_argument(
+        "--json", action="store_true", help=bi("machine-readable output", "машинный вывод")
+    )
     subs = parser.add_subparsers(dest="command")
 
-    subs.add_parser("scan", help="обойти детекты и записать реестр")
+    subs.add_parser(
+        "scan", help=bi("probe detectors, write registry", "обойти детекты, записать реестр")
+    )
 
-    ls_cmd = subs.add_parser("ls", help="показать парк")
+    ls_cmd = subs.add_parser("ls", help=bi("show the park", "показать парк"))
     ls_cmd.add_argument("capability", nargs="?")
 
-    why_cmd = subs.add_parser("why", help="объяснить выбор провайдера")
+    why_cmd = subs.add_parser(
+        "why", help=bi("explain provider choice", "объяснить выбор провайдера")
+    )
     why_cmd.add_argument("capability")
     why_cmd.add_argument("--in-type", dest="in_type")
 
-    run_cmd = subs.add_parser("run", help="запустить capability")
+    run_cmd = subs.add_parser("run", help=bi("run a capability", "запустить capability"))
     run_cmd.add_argument("capability")
     run_cmd.add_argument("input", nargs="?")
     run_cmd.add_argument("-o", "--out")
@@ -50,43 +60,60 @@ def build_parser() -> argparse.ArgumentParser:
     run_cmd.add_argument(
         "--fallback",
         action="store_true",
-        help="разрешить переход на следующего провайдера, если у лучшего исчерпано окно",
+        help=bi(
+            "allow the next provider when the best one is quota-exhausted",
+            "разрешить следующего провайдера, если у лучшего исчерпано окно",
+        ),
     )
-
     run_cmd.add_argument(
-        "--no-dossier", action="store_true", help="не подмешивать накопленные уроки в промпт"
+        "--no-dossier",
+        action="store_true",
+        help=bi(
+            "do not inject learned lessons into the prompt",
+            "не подмешивать накопленные уроки в промпт",
+        ),
     )
 
-    subs.add_parser("quota", help="окна квот: сожжено, что простаивает")
-    subs.add_parser("learn", help="сжать новые исходы запусков в досье провайдеров")
+    subs.add_parser("quota", help=bi("quota windows", "окна квот: сожжено, что простаивает"))
+    subs.add_parser("learn", help=bi("distil run outcomes into dossiers", "сжать исходы в досье"))
 
-    burn_cmd = subs.add_parser("burn", help="прожечь простаивающую квоту")
+    burn_cmd = subs.add_parser("burn", help=bi("burn idle quota", "прожечь простаивающую квоту"))
     burn_subs = burn_cmd.add_subparsers(dest="burn_command")
-    burn_add = burn_subs.add_parser("add", help="положить задачу в очередь")
+    burn_add = burn_subs.add_parser("add", help=bi("queue a task", "положить задачу в очередь"))
     burn_add.add_argument("capability")
     burn_add.add_argument("input")
     burn_add.add_argument("--note", default="")
-    burn_run = burn_subs.add_parser("run", help="показать или выполнить подходящие задачи")
-    burn_run.add_argument("--yes", action="store_true", help="действительно запускать")
+    burn_run = burn_subs.add_parser(
+        "run", help=bi("show or execute matching tasks", "показать или выполнить задачи")
+    )
+    burn_run.add_argument(
+        "--yes", action="store_true", help=bi("actually execute", "действительно запускать")
+    )
 
-    recipe_cmd = subs.add_parser("recipe", help="готовые цепочки")
+    recipe_cmd = subs.add_parser("recipe", help=bi("ready-made chains", "готовые цепочки"))
     recipe_subs = recipe_cmd.add_subparsers(dest="recipe_command")
-    recipe_subs.add_parser("ls", help="список рецептов")
-    recipe_run = recipe_subs.add_parser("run", help="выполнить рецепт")
+    recipe_subs.add_parser("ls", help=bi("list recipes", "список рецептов"))
+    recipe_run = recipe_subs.add_parser("run", help=bi("execute a recipe", "выполнить рецепт"))
     recipe_run.add_argument("recipe_id")
     recipe_run.add_argument("input")
 
-    subs.add_parser("adapt", help="собрать roles.json под эту машину")
+    subs.add_parser("adapt", help=bi("build roles.json for this machine", "собрать roles.json"))
 
-    orch = subs.add_parser("orchestrate", help="провести задачу по стадиям через роли")
+    orch = subs.add_parser(
+        "orchestrate", help=bi("drive a task through role stages", "провести задачу по стадиям")
+    )
     orch.add_argument("task")
-    orch.add_argument("--dir", default=".", help="репозиторий, в котором работать")
+    orch.add_argument(
+        "--dir", default=".", help=bi("repository to work in", "репозиторий, в котором работать")
+    )
     orch.add_argument("--pattern", default="default")
-    orch.add_argument("--role", default="mechanics", help="роль стадии work")
+    orch.add_argument(
+        "--role", default="mechanics", help=bi("role for the work stage", "роль стадии work")
+    )
     orch.add_argument("--fanout", type=int, default=1)
 
-    subs.add_parser("doctor", help="проверить целостность каталога")
-    subs.add_parser("stats", help="сколько раз что вызывалось")
+    subs.add_parser("doctor", help=bi("check catalog integrity", "проверить целостность каталога"))
+    subs.add_parser("stats", help=bi("what actually gets used", "сколько раз что вызывалось"))
     return parser
 
 
@@ -98,6 +125,21 @@ def _exhausted(catalog: Catalog) -> frozenset[str]:
     """
     now = datetime.now(UTC)
     return exhausted_set(compute(catalog.providers, read_all(), now=now), now=now)
+
+
+def _auto_learn() -> None:
+    """Досье пополняются сами после любой команды, которая что-то запускала."""
+    if should_auto_learn():
+        touched = learn()
+        if touched:
+            label = bi("dossiers updated", "досье обновлены")
+            print(f"{label}: {', '.join(touched)}", file=sys.stderr)
+
+
+def _require_files(paths: tuple[str, ...], *, what: str) -> None:
+    for raw in paths:
+        if not Path(raw).expanduser().is_file():
+            raise NnError(Exit.BAD_IO, f"{what} {raw} не найден")
 
 
 def _load_registry() -> Registry:
@@ -136,9 +178,12 @@ def _cmd_scan(as_json: bool) -> int:
         )
     else:
         summary = ", ".join(f"{status}: {count}" for status, count in sorted(counts.items()))
-        print(f"реестр записан: {path}\n{summary or 'провайдеров нет'}")
+        empty = bi("no providers", "провайдеров нет")
+        label = bi("registry written", "реестр записан")
+        print(f"{label}: {path}\n{summary or empty}")
         if drift:
-            print(f"\nизменения с прошлого скана:\n{format_drift(drift)}")
+            title = bi("changes since last scan", "изменения с прошлого скана")
+            print(f"\n{title}:\n{format_drift(drift)}")
     return int(Exit.OK)
 
 
@@ -170,6 +215,8 @@ def _cmd_why(capability: str, in_type: str | None, as_json: bool) -> int:
         catalog=catalog,
         registry=registry,
         in_type=in_type,
+        exhausted=_exhausted(catalog),
+        allow_fallback=True,
         last_success=last_success_map(),
     )
     if as_json:
@@ -189,6 +236,11 @@ def _cmd_why(capability: str, in_type: str | None, as_json: bool) -> int:
         )
     else:
         print(table(why_rows(choice), WHY_HEADERS))
+        if any("квоты" in r.reason for r in choice.rejected):
+            print(
+                "\nу кого-то исчерпано окно квоты: nn run откажется кодом 6,"
+                " пока не передашь --fallback"
+            )
     return int(Exit.OK)
 
 
@@ -201,6 +253,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         if not source.is_file():
             raise NnError(Exit.BAD_IO, f"входной файл {source} не найден")
         in_type = type_of(str(source), catalog.types)
+    _require_files(tuple(args.extra), what="дополнительный вход")
     cap = catalog.capabilities.get(args.capability)
     if cap is not None:
         check_extra(cap, tuple(args.extra), catalog.types)
@@ -226,13 +279,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
     )
     print(envelope.to_json())
     if envelope.status == "manual":
-        print(f"\nвыполни вручную:\n{envelope.command}", file=sys.stderr)
-
-    # досье пополняется само, когда накопилось достаточно новых исходов
-    if should_auto_learn():
-        touched = learn()
-        if touched:
-            print(f"досье обновлены: {', '.join(touched)}", file=sys.stderr)
+        label = bi("run this manually", "выполни вручную")
+        print(f"\n{label}:\n{envelope.command}", file=sys.stderr)
+    _auto_learn()
     return int(exit_code_for(envelope))
 
 
@@ -255,7 +304,11 @@ def _cmd_adapt(as_json: bool) -> int:
         for name, plan in sorted(result.roles.items())
     ]
     print(table(rows, ["роль", "цепочка провайдеров", "worktree"]))
-    print(f"\nзаписано: {path}\nпоправь порядок руками, если он не тот — это цепочка фолбэков")
+    print(f"\n{bi('written', 'записано')}: {path}")
+    print(
+        "edit the order by hand if wrong: it is the fallback chain"
+        " / поправь порядок руками, это цепочка фолбэков"
+    )
     return int(Exit.OK)
 
 
@@ -278,13 +331,16 @@ def _cmd_orchestrate(args: argparse.Namespace) -> int:
     run_id = results[0].envelope.run_id if results else "empty"
     path = save_report(results, run_id)
     patches = [item.patch for item in results if item.patch]
-    print(f"отчёт: {path}")
+    print(f"{bi('report', 'отчёт')}: {path}")
     for patch in patches:
-        print(f"патч: {patch} (НЕ применён — мерж твой)")
+        label = bi("patch", "патч")
+        note = bi("NOT applied, merge is yours", "НЕ применён, мерж твой")
+        print(f"{label}: {patch} ({note})")
     failed = [item for item in results if item.envelope.outcome != "success"]
     if failed:
         names = ", ".join(f"{i.stage}/{i.provider}: {i.envelope.outcome}" for i in failed)
-        print(f"неудачные стадии: {names}", file=sys.stderr)
+        label = bi("failed stages", "неудачные стадии")
+        print(f"{label}: {names}", file=sys.stderr)
         return int(Exit.PROVIDER_FAILED)
     return int(Exit.OK)
 
@@ -296,15 +352,19 @@ def _cmd_learn(as_json: bool) -> int:
         print(json.dumps({"providers": touched, "processed": pending}, ensure_ascii=False))
         return int(Exit.OK)
     if not touched and not pending:
-        print("новых исходов нет — досье не менялись")
+        print(bi("nothing new", "новых исходов нет"))
     elif not touched:
-        # различаем «нечего читать» и «прочитали, но до порога не дотянуло»
         print(
-            f"обработано новых записей: {pending}. уроков не набралось —"
-            " пороги: 3 повтора одной подписи ошибки, 3 пустых ответа, 2 таймаута"
+            bi(
+                f"processed {pending} new records, no lessons yet;"
+                " thresholds: 3 repeats of one error signature, 3 empty answers, 2 timeouts",
+                f"обработано новых записей: {pending}, уроков не набралось;"
+                " пороги: 3 повтора одной подписи ошибки, 3 пустых ответа, 2 таймаута",
+            )
         )
     else:
-        print(f"досье обновлены: {', '.join(touched)}")
+        label = bi("dossiers updated", "досье обновлены")
+        print(f"{label}: {', '.join(touched)}")
         for provider in touched:
             print(f"  {state_dir() / 'dossiers' / f'{provider}.md'}")
     return int(Exit.OK)
@@ -340,13 +400,12 @@ def _cmd_quota(as_json: bool) -> int:
     ]
     print(table(rows, ["провайдер", "окно", "сожжено", "состояние", "закроется"]))
     if not windows:
-        print("\nни один манифест не объявил window_h — учитывать нечего")
+        print(bi("\nno manifest declares window_h", "ни один манифест не объявил window_h"))
     return int(Exit.OK)
 
 
 def _cmd_burn(args: argparse.Namespace) -> int:
     from nn.burn import BurnTask, candidates, enqueue, read_queue, rewrite_queue
-    from nn.recipe import run_recipe  # noqa: F401 — держим импорт рядом с исполнением
 
     catalog = load_catalog()
     now = datetime.now(UTC)
@@ -360,7 +419,8 @@ def _cmd_burn(args: argparse.Namespace) -> int:
                 note=args.note,
             )
         )
-        print(f"в очередь: {args.capability} ← {args.input}")
+        label = bi("queued", "в очередь")
+        print(f"{label}: {args.capability} ← {args.input}")
         return int(Exit.OK)
 
     windows = compute(catalog.providers, read_all(), now=now)
@@ -369,7 +429,12 @@ def _cmd_burn(args: argparse.Namespace) -> int:
     pairs = candidates(windows, tasks, provider_capability, now=now)
 
     if not pairs:
-        print("прожигать нечего: либо нет простаивающих окон, либо очередь пуста")
+        print(
+            bi(
+                "nothing to burn: no idle windows or the queue is empty",
+                "прожигать нечего: нет простаивающих окон либо очередь пуста",
+            )
+        )
         return int(Exit.OK)
 
     rows = [
@@ -379,18 +444,29 @@ def _cmd_burn(args: argparse.Namespace) -> int:
     print(table(rows, ["окно", "capability", "вход", "закроется"]))
 
     if not args.yes:
-        print("\nэто предложение. запуск — с --yes")
+        print(bi("\nthis is a proposal, add --yes to run", "запуск с --yes"))
         return int(Exit.OK)
 
     registry = _load_registry()
+    exhausted = exhausted_set(windows, now=now)
     done: list[str] = []
     for window, item in pairs:
+        if window.provider in exhausted:
+            reason = bi("window closed, skipping", "окно закрылось, пропускаю")
+            print(f"{window.provider}: {reason}", file=sys.stderr)
+            continue
+        if not Path(item.input).expanduser().is_file():
+            gone = bi("is gone, task dropped from queue", "исчез, задача выброшена из очереди")
+            print(f"{item.input} {gone}", file=sys.stderr)
+            done.append(item.input)
+            continue
         choice = resolve(
             item.capability,
             catalog=catalog,
             registry=registry,
             in_type=type_of(item.input, catalog.types),
             pin=window.provider,
+            exhausted=exhausted,
             last_success=last_success_map(),
         )
         envelope = execute(choice, catalog=catalog, in_path=item.input)
@@ -398,6 +474,7 @@ def _cmd_burn(args: argparse.Namespace) -> int:
         if envelope.outcome == "success":
             done.append(item.input)
     rewrite_queue([t for t in tasks if t.input not in done])
+    _auto_learn()
     return int(Exit.OK)
 
 
@@ -426,7 +503,14 @@ def _cmd_recipe(args: argparse.Namespace) -> int:
     if not source.is_file():
         raise NnError(Exit.BAD_IO, f"входной файл {source} не найден")
 
-    results = run_recipe(recipe, catalog=catalog, registry=registry, input_path=str(source))
+    results = run_recipe(
+        recipe,
+        catalog=catalog,
+        registry=registry,
+        input_path=str(source),
+        exhausted=_exhausted(catalog),
+    )
+    _auto_learn()
     payload = [json.loads(r.envelope.to_json()) for r in results]
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     if not results:

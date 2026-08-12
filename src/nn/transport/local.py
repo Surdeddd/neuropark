@@ -21,7 +21,7 @@ class LocalTransport:
         environ = dict(os.environ)
         environ.update(env)
         try:
-            done = subprocess.run(  # noqa: S602 — команда собрана из наших манифестов
+            done = subprocess.run(  # noqa: S602
                 command,
                 shell=True,
                 cwd=work_dir,
