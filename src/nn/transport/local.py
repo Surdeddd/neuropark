@@ -5,10 +5,21 @@ from collections.abc import Mapping
 
 from nn.gitenv import clean_env
 from nn.model import Host
-from nn.transport.base import Executed
+from nn.transport.base import Executed, Prepared
 
 
 class LocalTransport:
+    def prepare(
+        self, context: dict[str, str], *, host: Host, run_id: str, env: Mapping[str, str]
+    ) -> Prepared:
+        return Prepared(context)
+
+    def collect(self) -> Executed | None:
+        return None
+
+    def finish(self) -> None:
+        return None
+
     def execute(
         self,
         command: str,

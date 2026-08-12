@@ -16,7 +16,7 @@ from nn.paths import state_dir
 from nn.render import build_context, pick, render
 from nn.resolve import Choice
 from nn.runlog import RunRecord, append
-from nn.transport import Executed, get_transport, resolve_env
+from nn.transport import Executed, LocalTransport, get_transport, resolve_env
 
 NO_RETRY = {"quota", "refused", "empty"}
 STDERR_TAIL_CHARS = 800
@@ -133,7 +133,10 @@ def execute(
                 ),
             )
         command = render(template, {"in": source_path, "out": bridge_out, "tmp": tmp_prefix})
-        result = transport.execute(
+        # Мостик всегда локальный: его наличие проверяется локально (nn scan, doctor),
+        # значит и запускать его надо здесь. Раньше он уходил в транспорт провайдера —
+        # для ssh это была бы попытка запустить ffmpeg там, где его никто не проверял.
+        result = LocalTransport().execute(
             command, host=choice.host, timeout_s=BRIDGE_TIMEOUT_S, work_dir=work, env=env_vars
         )
         log_parts.append(f"$ {command}\n{result.stdout}{result.stderr}")
@@ -165,52 +168,88 @@ def execute(
         extra={f"extra{i}": value for i, value in enumerate(extra)},
     )
 
+    # Транспорт получает право переписать пути под свою машину и забросить туда вход.
+    # Провал подготовки — это исход прогона, а не исключение: недоступный хост должен
+    # попасть в журнал, иначе досье не смогут на нём учиться.
+    prepared = transport.prepare(context, host=choice.host, run_id=run_id, env=env_vars)
+    if prepared.failure is not None:
+        # Убрать надо и здесь: подготовка могла упасть уже после создания рабочей
+        # директории на той стороне, и тогда она оставалась там навсегда.
+        transport.finish()
+        log_parts.append(f"$ {prepared.failure.command}\n{prepared.failure.stderr}")
+        log_file.write_text("\n".join(log_parts), encoding="utf-8")
+        return _envelope(
+            "error",
+            run_id,
+            choice,
+            in_path,
+            None,
+            bridge_id,
+            started,
+            prepared.failure,
+            "timeout" if prepared.failure.timed_out else "crash",
+            log_file,
+        )
+    context = prepared.context
+
     attempts = max(0, retries) + 1
     result = Executed(0, "", "", False, "")
     outcome = "crash"
-    for attempt in range(attempts):
-        for stage in ("pre", "run", "post"):
-            template = pick(getattr(provider, stage))
-            if template is None:
-                continue
-            command = render(template, context)
-            result = transport.execute(
-                command,
-                host=choice.host,
-                timeout_s=provider.timeout_s,
-                work_dir=work,
-                env=env_vars,
+    try:
+        for attempt in range(attempts):
+            for stage in ("pre", "run", "post"):
+                template = pick(getattr(provider, stage))
+                if template is None:
+                    continue
+                command = render(template, context)
+                result = transport.execute(
+                    command,
+                    host=choice.host,
+                    timeout_s=provider.timeout_s,
+                    work_dir=work,
+                    env=env_vars,
+                )
+                log_parts.append(f"$ {command}\n{result.stdout}{result.stderr}")
+                if result.exit_code != 0 or result.timed_out:
+                    break
+
+            if choice.manual:
+                log_file.write_text("\n".join(log_parts), encoding="utf-8")
+                return _envelope(
+                    "manual",
+                    run_id,
+                    choice,
+                    in_path,
+                    None,
+                    bridge_id,
+                    started,
+                    result,
+                    "manual",
+                    log_file,
+                )
+
+            # Выход надо забрать до классификации: она смотрит на локальный файл,
+            # а у удалённого прогона он пока лежит на той стороне.
+            fetched = transport.collect()
+            if fetched is not None:
+                log_parts.append(f"$ {fetched.command}\n{fetched.stderr}")
+                result = fetched
+
+            outcome = classify(
+                exit_code=result.exit_code,
+                out_path=final_out,
+                out_type=out_type,
+                stderr=result.stderr,
+                timed_out=result.timed_out,
+                quota_patterns=provider.quota_patterns,
             )
-            log_parts.append(f"$ {command}\n{result.stdout}{result.stderr}")
-            if result.exit_code != 0 or result.timed_out:
+            if outcome == "success" or outcome in NO_RETRY or attempt == attempts - 1:
                 break
-
-        if choice.manual:
-            log_file.write_text("\n".join(log_parts), encoding="utf-8")
-            return _envelope(
-                "manual",
-                run_id,
-                choice,
-                in_path,
-                None,
-                bridge_id,
-                started,
-                result,
-                "manual",
-                log_file,
-            )
-
-        outcome = classify(
-            exit_code=result.exit_code,
-            out_path=final_out,
-            out_type=out_type,
-            stderr=result.stderr,
-            timed_out=result.timed_out,
-            quota_patterns=provider.quota_patterns,
-        )
-        if outcome == "success" or outcome in NO_RETRY or attempt == attempts - 1:
-            break
-        log_parts.append(f"-- retry after outcome {outcome} --")
+            log_parts.append(f"-- retry after outcome {outcome} --")
+    finally:
+        # Уборка обязана произойти, чем бы прогон ни кончился: иначе на удалённой
+        # машине копятся директории прогонов, и никто их никогда не удалит.
+        transport.finish()
 
     log_file.write_text("\n".join(log_parts), encoding="utf-8")
     status = "ok" if outcome == "success" else "error"

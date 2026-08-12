@@ -46,6 +46,7 @@ class Host:
     probe: str | None = None
     paths: dict[str, str] = field(default_factory=dict)
     env: dict[str, str] = field(default_factory=dict)
+    ssh_options: tuple[str, ...] = ()
     notes: str = ""
 
 

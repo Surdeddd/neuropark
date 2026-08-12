@@ -7,6 +7,36 @@ speaks both English and Russian.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · versioning: [SemVer](https://semver.org/).
 
+## 0.8.0 — 2026-08-12
+
+### Added
+
+- **The ssh transport actually runs things.** A host with `kind: ssh` and `auto: true` no
+  longer just prints a command: the input is sent to `paths.tmp`, the command runs in a
+  per-run directory, the output (and any sibling the tool wrote next to it, which is how
+  whisper behaves) comes back, and the directory is removed — whatever the outcome.
+  - Files travel over the same ssh channel that runs the command, so nothing beyond `ssh`
+    needs to exist on either side.
+  - Secrets reach the command through the shell's environment, never through `argv` (visible
+    in `ps` on the far side) and never as a file on the remote disk.
+  - An unreachable host is a **recorded run** with outcome `crash`, not an exception — which
+    is what lets dossiers learn from it.
+  - `rm -rf` on the far side is guarded: it only fires for a path that ends in `/nn-<run_id>`
+    with a non-empty run id.
+- `ssh_options` in a host file for a one-off port, identity file or jump host. Permanent
+  settings still belong in `~/.ssh/config`, so the field is optional.
+- A dossier rule for `command not found`: on a remote host that almost always means the
+  minimal `PATH` of a non-interactive ssh shell, not a missing tool.
+
+### Fixed
+
+- **Bridges ran on the provider's transport.** A bridge's availability is checked locally
+  (`nn scan`, `nn doctor`), so running it on a remote machine tested nothing. Bridges are
+  local now, and their output is staged like any other input.
+- **A failed preparation left its directory behind.** When staging failed *after* the remote
+  directory was created, nothing cleaned it up — found by a live run that left `nn-…` dirs on
+  the far side.
+
 ## 0.7.0 — 2026-08-12
 
 Setup, presentation, and the localization the previous release only claimed.

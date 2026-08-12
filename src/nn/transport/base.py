@@ -21,7 +21,23 @@ class Executed:
     command: str
 
 
+@dataclass(frozen=True)
+class Prepared:
+    """Контекст, которым рендерятся команды, и провал подготовки, если он случился.
+
+    Провал приходит значением, а не исключением: недоступный хост должен попасть в
+    журнал прогонов как исход, иначе досье не смогут на нём учиться.
+    """
+
+    context: dict[str, str]
+    failure: Executed | None = None
+
+
 class Transport(Protocol):
+    def prepare(
+        self, context: dict[str, str], *, host: Host, run_id: str, env: Mapping[str, str]
+    ) -> Prepared: ...
+
     def execute(
         self,
         command: str,
@@ -31,6 +47,14 @@ class Transport(Protocol):
         work_dir: str,
         env: Mapping[str, str],
     ) -> Executed: ...
+
+    def collect(self) -> Executed | None:
+        """Забрать выход туда, где его ждут. Вызывается после каждой попытки."""
+        ...
+
+    def finish(self) -> None:
+        """Убрать за собой. Вызывается один раз, чем бы прогон ни кончился."""
+        ...
 
 
 def resolve_env(host: Host, base: Mapping[str, str]) -> dict[str, str]:

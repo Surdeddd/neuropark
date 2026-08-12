@@ -108,7 +108,7 @@ that `nn` refuses to use it. Then it prints one line naming the command that fix
             │    bridge     │   ffmpeg -vn  →  16k mono wav
             └───────┬───────┘
                     ▼
-            ┌───────────────┐   local · manual (prints the command)
+            ┌───────────────┐   local · ssh (stages files) · manual (prints it)
             │  transport    │
             └───────┬───────┘
                     ▼
@@ -184,14 +184,21 @@ Ready-made patterns live in [`examples/`](examples/): a script needing its own i
 <summary><b>Add a machine</b></summary>
 
 ```json
-{ "id": "gpu-box", "kind": "ssh", "addr": "gpu-box", "auto": false,
+{ "id": "gpu-box", "kind": "ssh", "addr": "gpu-box", "auto": true,
   "probe": "ssh -o ConnectTimeout=3 -o BatchMode=yes gpu-box true",
-  "paths": { "models": "/data/models" } }
+  "paths": { "models": "/data/models", "tmp": "/var/tmp" },
+  "env": { "PATH": "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin" } }
 ```
 
-`kind`: `local` · `ssh` · `http` · `manual`. **`auto: false` means `nn` prints the ready command instead of running it** — remote tools stay in the catalog and in `nn why` without dragging in the whole class of sleep-and-network bugs.
+`kind`: `local` · `ssh` · `http` · `manual`. **`auto: false` means `nn` prints the ready command instead of running it** — useful for a machine you'd rather drive by hand, and the only mode `http` has.
 
-Secrets go in only by reference: `"KEY": "@file:~/.config/secrets/k"`. Read at run time, never committed.
+**A remote run with `auto: true`** sends the input to `paths.tmp` (default `/tmp`), runs the command in a per-run directory, brings the output back, and removes that directory — whatever the outcome. Files travel over the same ssh channel that runs the command, so nothing beyond `ssh` has to be installed. A host that is asleep or unreachable becomes a recorded run with outcome `crash`, not a stack trace.
+
+> **Set `env.PATH`.** A non-interactive ssh shell has a minimal `PATH` and does not see `/opt/homebrew/bin` or `/usr/local/bin`. Without it, a tool that *is* installed still reports `command not found` — nn's dossier will tell you so, but it costs a run to find out.
+
+Port, identity file and jump host belong in `~/.ssh/config` (`addr` is then just the alias); `"ssh_options": ["-p", "2222"]` is there for the one-off case. `BatchMode` is always on, so nn never hangs on a password prompt.
+
+Secrets go in only by reference: `"KEY": "@file:~/.config/secrets/k"`. Read at run time, never committed — and on a remote run they reach the command through the shell's environment, never through `argv` (visible in `ps` on the far side) and never as a file on the remote disk.
 
 </details>
 
@@ -305,7 +312,7 @@ disappeared:
 
 ```bash
 make help         # every target
-make check        # ruff + ruff format + mypy --strict + 353 unit tests, no network, ~10s
+make check        # ruff + ruff format + mypy --strict + 382 unit tests, no network, ~10s
 make smoke-fast   # live offline runs: scan, transcript, bridge, doctor (~30s)
 make smoke        # plus TTS with a cold model start (up to 15 min)
 make hooks        # git pre-commit hook: the same checks before anything enters history
@@ -319,7 +326,7 @@ Rules that hold: stdlib only at runtime · no `type: ignore` anywhere in `src` �
 
 Adding a tool needs no code from you — see [CONTRIBUTING.md](CONTRIBUTING.md). Release notes: [CHANGELOG.md](CHANGELOG.md).
 
-Not implemented, and saying so instead of failing silently: `ssh`/`http` transports (remote hosts print the command), `adapter` providers for tools needing a queue, recipes with multiple inputs.
+Not implemented, and saying so instead of failing silently: the `http` transport (such hosts print the command), `adapter` providers for tools that need a queue, recipes with multiple inputs.
 
 ## License
 

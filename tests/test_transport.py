@@ -65,8 +65,9 @@ def test_get_transport_manual_kind():
     assert isinstance(get_transport(Host(id="h", kind="manual")), ManualTransport)
 
 
-def test_ssh_transport_not_available_yet():
-    host = Host(id="mini", kind="ssh", addr="remote-box", auto=True)
+def test_http_transport_is_still_honestly_absent():
+    """Нереализованный транспорт называет себя, а не делает вид, что работает."""
+    host = Host(id="api", kind="http", addr="https://box", auto=True)
     with pytest.raises(NnError) as err:
         get_transport(host)
     assert err.value.code == Exit.BAD_DATA

@@ -149,6 +149,7 @@ def parse_host(raw: dict[str, Any], source: str) -> Host:
         probe=raw.get("probe"),
         paths={str(k): str(v) for k, v in (raw.get("paths") or {}).items()},
         env={str(k): str(v) for k, v in (raw.get("env") or {}).items()},
+        ssh_options=tuple(str(x) for x in raw.get("ssh_options") or ()),
         notes=bilingual(raw.get("notes"), source, "notes"),
     )
 

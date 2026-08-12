@@ -89,3 +89,62 @@ jobs:
           code=0
           NN_PYTHON=/bin/echo ./bin/nn --version || code=$?
           test "$code" -eq 7 || { echo "expected exit 7, got $code"; exit 1; }
+
+  # The ssh transport is worth testing against a real sshd, not a fake one: both bugs
+  # it had came from the transfer layer. A throwaway sshd on a high port with its own
+  # keys is enough — file transfer rides the ssh channel, so no sftp subsystem needed.
+  ssh:
+    name: live ssh transport
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Start a throwaway sshd
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/sshd"
+          mkdir -p "$dir"
+          chmod 700 "$dir"
+          ssh-keygen -q -t ed25519 -N '' -f "$dir/hostkey"
+          ssh-keygen -q -t ed25519 -N '' -f "$dir/clientkey"
+          cp "$dir/clientkey.pub" "$dir/authorized_keys"
+          chmod 600 "$dir/authorized_keys"
+          {
+            echo "Port 2222"
+            echo "ListenAddress 127.0.0.1"
+            echo "HostKey $dir/hostkey"
+            echo "AuthorizedKeysFile $dir/authorized_keys"
+            echo "StrictModes no"
+            echo "UsePAM no"
+            echo "PasswordAuthentication no"
+            echo "PidFile $dir/sshd.pid"
+          } > "$dir/sshd_config"
+          sudo /usr/sbin/sshd -f "$dir/sshd_config" -E "$dir/sshd.log"
+          for _ in $(seq 1 20); do
+            nc -z 127.0.0.1 2222 && break
+            sleep 0.5
+          done
+          ssh-keyscan -p 2222 -t ed25519 127.0.0.1 > "$dir/known_hosts" 2>/dev/null
+          ssh -p 2222 -i "$dir/clientkey" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile="$dir/known_hosts" 127.0.0.1 true
+
+      - name: Live ssh smokes
+        env:
+          NN_SSH_SMOKE_HOST: 127.0.0.1
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/sshd"
+          export NN_SSH_SMOKE_OPTS="-p 2222 -i $dir/clientkey -o IdentitiesOnly=yes -o UserKnownHostsFile=$dir/known_hosts"
+          pytest tests/test_smoke_ssh.py -v
+
+      # A skipped smoke must look skipped, never green-by-accident.
+      - name: Without a host the smokes skip, not pass
+        run: pytest tests/test_smoke_ssh.py -q -rs | tee /dev/stderr | grep -q "6 skipped"

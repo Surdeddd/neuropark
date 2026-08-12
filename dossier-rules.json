@@ -26,6 +26,13 @@
       }
     },
     {
+      "match": "command not found",
+      "instruction": {
+        "en": "the tool is not on PATH where the command runs. On a remote host this is the usual case: a non-interactive ssh shell does not see /opt/homebrew/bin or /usr/local/bin — set PATH in the host's env",
+        "ru": "инструмента нет в PATH там, где выполняется команда. На удалённом хосте это обычное дело: неинтерактивный ssh-шелл не видит /opt/homebrew/bin и /usr/local/bin — задай PATH в env хоста"
+      }
+    },
+    {
       "match": "connection refused",
       "instruction": {
         "en": "the host is not up: check probe in the host file, and whether the machine is asleep",

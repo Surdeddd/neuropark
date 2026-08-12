@@ -3,17 +3,20 @@
   "kind": "ssh",
   "addr": "gpu-box",
   "os": "linux",
-  "auto": false,
+  "auto": true,
   "probe": "ssh -o ConnectTimeout=3 -o BatchMode=yes gpu-box true",
   "paths": {
     "comfy": "http://127.0.0.1:8188",
-    "models": "/data/models"
+    "models": "/data/models",
+    "tmp": "/var/tmp"
   },
   "env": {
+    "PATH": "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin",
     "SOME_API_KEY": "@file:~/.config/secrets/some.key"
   },
+  "ssh_options": [],
   "notes": {
-    "en": "A machine reached over ssh. auto=false means nn prints the command instead of running it — flip to true only when you are ready for remote execution. Secrets go in only as @file: references, read at run time, never committed.",
-    "ru": "Машина по ssh. auto=false значит nn печатает команду, а не запускает — переключай в true, когда готов к удалённому исполнению. Секреты только ссылкой @file:, читаются в момент запуска и в git не попадают."
+    "en": "A machine reached over ssh. auto=true runs there for real: the input is sent to paths.tmp, the command runs in a per-run directory, the output comes back, the directory is removed. PATH matters — a non-interactive ssh shell does not see /opt/homebrew/bin, so a tool that exists is still 'command not found' without it. auto=false turns this host back into a printed command. Port, key and jump host go into ssh_options, or better into ~/.ssh/config. Secrets only as @file: references, read at run time, never committed, never written to the remote disk.",
+    "ru": "Машина по ssh. auto=true запускает там по-настоящему: вход уезжает в paths.tmp, команда работает в директории прогона, выход возвращается, директория убирается. PATH важен — неинтерактивный ssh-шелл не видит /opt/homebrew/bin, и установленный инструмент всё равно окажется «command not found». auto=false возвращает хосту режим печати команды. Порт, ключ и jump-хост — в ssh_options, а лучше в ~/.ssh/config. Секреты только ссылкой @file:, читаются в момент запуска, в git не попадают и на диск удалённой машины тоже."
   }
 }
