@@ -1,0 +1,28 @@
+[project]
+name = "neuropark"
+version = "0.1.0"
+description = "nn — каталог парка нейронок и единый контракт вызова"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "PTH"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+mypy_path = "src"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+markers = [
+  "smoke: живой запуск на реальном железе, офлайн",
+  "slow: минуты на прогон (холодный старт моделей) — исключается из make smoke-fast",
+]

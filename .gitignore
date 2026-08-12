@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+.DS_Store
+
+# dev-инструменты подключаются эфемерно через `uv run --with pytest`,
+# поэтому лок не фиксирует их версии и только вводит в заблуждение
+uv.lock
+
