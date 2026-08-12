@@ -1,0 +1,17 @@
+{
+  "id": "ben-voice-clone",
+  "capability": "tts",
+  "kind": "model",
+  "rank": 10,
+  "detect": {
+    "files": [
+      "~/scripts/ben-voice.py",
+      "~/Projects/Tools/qwen3-tts-apple-silicon/.venv/bin/python"
+    ]
+  },
+  "vars": { "py": "~/Projects/Tools/qwen3-tts-apple-silicon/.venv/bin/python" },
+  "io": { "in": ["text"], "out": "audio", "out_ext": "ogg" },
+  "run": "{py} ~/scripts/ben-voice.py --model clone --out {out} \"$(cat {in})\"",
+  "timeout_s": 1800,
+  "notes": "Qwen3-TTS на MLX, клонированный голос, офлайн. ТОЛЬКО этим интерпретатором: у системного python3 нет mlx_audio. --out всегда OGG/Opus, отсюда out_ext. Есть внутренняя сверка дублей — на коротких фразах может отбраковать всё (лечится --takes 3 или --no-verify). Холодный старт грузит модель ~2 мин, для тёплых прогонов существует демон com.maxim.ben-voice-daemon"
+}

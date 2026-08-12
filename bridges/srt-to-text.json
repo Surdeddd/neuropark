@@ -1,0 +1,8 @@
+{
+  "id": "srt-to-text",
+  "from": "srt",
+  "to": "text",
+  "detect": { "bin": "sed" },
+  "run": "sed -E '/^[0-9]+$/d; /-->/d; /^$/d' {in} > {out}",
+  "out_ext": "txt"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "ffmpeg-audio-clean",
+  "capability": "audio-clean",
+  "kind": "tool",
+  "rank": 10,
+  "detect": {
+    "bin": "ffmpeg-normalize",
+    "files": ["~/Models/rnnoise/sh.rnnn"]
+  },
+  "vars": { "rnnn": "~/Models/rnnoise/sh.rnnn" },
+  "io": { "in": ["audio"], "out": "audio" },
+  "pre": "ffmpeg -nostdin -y -i {in} -af arnndn=m={rnnn} {tmp}.wav",
+  "run": "ffmpeg-normalize {tmp}.wav -o {out} -f",
+  "timeout_s": 900,
+  "notes": "одобренный рецепт rnnoise+loudnorm, +3.39dB разборчивости. detect проверяет ffmpeg-normalize, а не ffmpeg: он и есть узкое место"
+}

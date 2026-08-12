@@ -1,0 +1,8 @@
+{
+  "id": "video-to-audio",
+  "from": "video",
+  "to": "audio",
+  "detect": { "bin": "ffmpeg" },
+  "run": "ffmpeg -nostdin -y -i {in} -vn -ar 16000 -ac 1 {out}",
+  "out_ext": "wav"
+}

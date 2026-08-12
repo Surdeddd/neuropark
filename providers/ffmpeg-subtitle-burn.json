@@ -1,0 +1,11 @@
+{
+  "id": "ffmpeg-subtitle-burn",
+  "capability": "subtitle-burn",
+  "kind": "tool",
+  "rank": 10,
+  "detect": { "bin": "ffmpeg" },
+  "io": { "in": ["video"], "out": "video" },
+  "run": "ffmpeg -nostdin -y -i {in} -vf subtitles={extra0}:force_style='FontSize=18' -c:a copy {out}",
+  "timeout_s": 3600,
+  "notes": "вжигает сабы в картинку, сабы приходят через --extra. звук копируется без перекодирования"
+}

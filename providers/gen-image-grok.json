@@ -1,0 +1,15 @@
+{
+  "id": "gen-image-grok",
+  "capability": "image",
+  "kind": "model",
+  "rank": 6,
+  "detect": {
+    "files": ["~/scripts/gen-image.py"],
+    "bin": "grok"
+  },
+  "io": { "in": ["text"], "out": "image" },
+  "run": "python3 ~/scripts/gen-image.py generate --provider grok --prompt \"$(cat {in})\" --out {out}",
+  "timeout_s": 600,
+  "quota_patterns": ["usage limit", "rate limit", "quota"],
+  "notes": "Grok Imagine: быстрее и вольнее по стилю, слабее по тексту в кадре"
+}

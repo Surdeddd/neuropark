@@ -1,0 +1,13 @@
+{
+  "id": "claude-translate",
+  "capability": "translate",
+  "kind": "agent",
+  "rank": 10,
+  "detect": { "bin": "claude" },
+  "vars": { "lang": "ru" },
+  "io": { "in": ["srt", "text"], "out": "same" },
+  "run": "claude -p \"Переведи на {lang}. Если это SRT — сохрани нумерацию и тайминги без изменений, переводи только текстовые строки. Верни только результат, без пояснений.\" < {in} > {out}",
+  "timeout_s": 900,
+  "quota_patterns": ["usage limit", "rate limit"],
+  "notes": "подписка Max, без API-ключа. тайминги не трогает. на длинных сабах может упереться в окно — тогда режь вход"
+}

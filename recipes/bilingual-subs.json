@@ -1,0 +1,10 @@
+{
+  "id": "bilingual-subs",
+  "description": "видео → транскрипт → перевод на русский → сабы, вжжённые в картинку",
+  "steps": [
+    { "capability": "transcribe" },
+    { "capability": "translate", "vars": { "lang": "ru" } },
+    { "capability": "subtitle-burn", "in": "{input}", "extra_in": ["{step1.out}"] }
+  ],
+  "on_quota": "fail"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "local",
+  "kind": "local",
+  "os": "darwin",
+  "auto": true,
+  "paths": {
+    "models": "~/Models",
+    "scripts": "~/scripts"
+  },
+  "notes": "macbook на подписке Max: env намеренно пустой — сюда нельзя пускать API-ключ, биллинг идёт через подписку"
+}

@@ -1,0 +1,27 @@
+{
+  "types": {
+    "video": ["mp4", "mov", "mkv", "webm"],
+    "audio": ["wav", "mp3", "m4a", "ogg", "flac"],
+    "image": ["png", "jpg", "jpeg", "webp"],
+    "text": ["txt", "md"],
+    "srt": ["srt", "vtt"],
+    "json": ["json"],
+    "mesh": ["glb", "gltf", "obj", "fbx"],
+    "vector": ["npy"]
+  },
+  "capabilities": {
+    "transcribe":    { "in": ["video", "audio"], "out": "srt" },
+    "tts":           { "in": ["text"],           "out": "audio" },
+    "image":         { "in": ["text"],           "out": "image" },
+    "image-edit":    { "in": ["image"],          "out": "image" },
+    "video-gen":     { "in": ["text", "image"],  "out": "video" },
+    "music":         { "in": ["text"],           "out": "audio" },
+    "mesh":          { "in": ["image", "text"],  "out": "mesh" },
+    "embed":         { "in": ["text"],           "out": "json" },
+    "text":          { "in": ["text"],           "out": "text" },
+    "translate":     { "in": ["text", "srt"],    "out": "same" },
+    "audio-clean":   { "in": ["audio"],          "out": "audio" },
+    "subtitle-burn": { "in": ["video"],          "out": "video", "extra": ["srt"] },
+    "compose":       { "in": ["video"],          "out": "video", "extra": ["audio"] }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "mac-mini",
+  "kind": "ssh",
+  "addr": "mac-mini",
+  "os": "darwin",
+  "auto": false,
+  "probe": "ssh -o ConnectTimeout=3 -o BatchMode=yes mac-mini true",
+  "env": {
+    "ANTHROPIC_API_KEY": "@file:~/.config/maxim-secrets/ethereal.key"
+  },
+  "notes": "рой на ethereal API. Ключ живёт ТОЛЬКО здесь: на local подписка Max, туда ключ пускать нельзя"
+}
