@@ -247,7 +247,8 @@ def check(
                     continue
                 problem = _ref_problem(ref, index)
                 if problem:
-                    findings.append(Finding("error", recipe.id, f"шаг {index}: {problem}"))
+                    prefix = bi(f"step {index}", f"шаг {index}")
+                    findings.append(Finding("error", recipe.id, f"{prefix}: {problem}"))
 
     for bridge in sorted(catalog.bridges.values(), key=lambda b: b.id):
         if run_detect(bridge.detect).status != "ok":

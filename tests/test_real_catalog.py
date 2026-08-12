@@ -67,6 +67,22 @@ def test_secrets_are_declared_as_file_references_only():
             assert value.startswith("@file:"), f"{host.id}.{key} — секрет в открытом виде"
 
 
+def test_providers_with_own_interpreter_declare_their_module():
+    """Дважды наступил: ben-voice и ben-embed требуют свой venv, системный python не годится.
+
+    Кто закрепил интерпретатор в vars.py — обязан объявить detect.python, иначе
+    скан не поймает пропажу зависимости и провайдер числится доступным до первого
+    падения. Проверять модуль в venv умеет detect с параметром interpreter.
+    """
+    catalog = load_catalog()
+    offenders = [
+        provider.id
+        for provider in catalog.providers.values()
+        if provider.vars.get("py") and not provider.detect.get("python")
+    ]
+    assert offenders == [], offenders
+
+
 def test_all_provider_notes_are_bilingual():
     """Заметки — текст для человека, значит обязаны быть на двух языках."""
     import json

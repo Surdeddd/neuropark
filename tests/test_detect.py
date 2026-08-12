@@ -67,6 +67,30 @@ def test_python_module_strategy():
     assert run_detect({"python": "absent_mod"}, runner=runner).status == "missing"
 
 
+def test_python_module_checked_with_pinned_interpreter():
+    """Регрессия: модуль проверялся системным python3, а не venv провайдера,
+    поэтому скан считал ben-voice и ben-embed доступными до первого падения."""
+    seen: list[str] = []
+
+    def runner(command, *, timeout):
+        seen.append(command)
+        return (0, "", "")
+
+    run_detect({"python": "mlx_audio"}, runner=runner, interpreter="/venv/bin/python3")
+    assert seen == ['/venv/bin/python3 -c "import mlx_audio"']
+
+
+def test_python_module_falls_back_to_system_interpreter():
+    seen: list[str] = []
+
+    def runner(command, *, timeout):
+        seen.append(command)
+        return (0, "", "")
+
+    run_detect({"python": "json"}, runner=runner)
+    assert seen == ['python3 -c "import json"']
+
+
 def test_npm_docker_brew_strategies():
     runner = fake_runner_factory(
         {

@@ -16,8 +16,21 @@ from nn.iotypes import check_extra, type_of
 from nn.paths import state_dir
 from nn.quota import compute, exhausted_set
 from nn.registry import Registry, is_expired, load, save
-from nn.report import LS_HEADERS, STATS_HEADERS, WHY_HEADERS, ls_rows, stats_rows, table, why_rows
-from nn.resolve import resolve
+from nn.report import (
+    BURN_HEADERS,
+    DOCTOR_HEADERS,
+    LS_HEADERS,
+    QUOTA_HEADERS,
+    RECIPE_HEADERS,
+    ROLE_HEADERS,
+    STATS_HEADERS,
+    WHY_HEADERS,
+    ls_rows,
+    stats_rows,
+    table,
+    why_rows,
+)
+from nn.resolve import QUOTA_BLOCKED, resolve
 from nn.run import execute, exit_code_for
 from nn.runlog import last_success_map, read_all
 from nn.scan import scan
@@ -139,7 +152,7 @@ def _auto_learn() -> None:
 def _require_files(paths: tuple[str, ...], *, what: str) -> None:
     for raw in paths:
         if not Path(raw).expanduser().is_file():
-            raise NnError(Exit.BAD_IO, f"{what} {raw} не найден")
+            raise NnError(Exit.BAD_IO, bi(f"{what} {raw} not found", f"{what} {raw} не найден"))
 
 
 def _load_registry() -> Registry:
@@ -147,7 +160,10 @@ def _load_registry() -> Registry:
     if is_expired(registry, now=datetime.now(UTC)):
         raise NnError(
             Exit.REGISTRY_STALE,
-            f"реестр от {registry.generated_at[:10]} старше 30 дней — сделай nn scan",
+            bi(
+                f"registry from {registry.generated_at[:10]} is older than 30 days, run nn scan",
+                f"реестр от {registry.generated_at[:10]} старше 30 дней — сделай nn scan",
+            ),
         )
     return registry
 
@@ -236,7 +252,7 @@ def _cmd_why(capability: str, in_type: str | None, as_json: bool) -> int:
         )
     else:
         print(table(why_rows(choice), WHY_HEADERS))
-        if any("квоты" in r.reason for r in choice.rejected):
+        if any(r.code == QUOTA_BLOCKED for r in choice.rejected):
             print(
                 "\nу кого-то исчерпано окно квоты: nn run откажется кодом 6,"
                 " пока не передашь --fallback"
@@ -251,7 +267,10 @@ def _cmd_run(args: argparse.Namespace) -> int:
     if args.input:
         source = Path(args.input)
         if not source.is_file():
-            raise NnError(Exit.BAD_IO, f"входной файл {source} не найден")
+            raise NnError(
+                Exit.BAD_IO,
+                bi(f"input file {source} not found", f"входной файл {source} не найден"),
+            )
         in_type = type_of(str(source), catalog.types)
     _require_files(tuple(args.extra), what="дополнительный вход")
     cap = catalog.capabilities.get(args.capability)
@@ -303,7 +322,7 @@ def _cmd_adapt(as_json: bool) -> int:
         [name, ", ".join(plan.providers), "да" if plan.worktree else "нет"]
         for name, plan in sorted(result.roles.items())
     ]
-    print(table(rows, ["роль", "цепочка провайдеров", "worktree"]))
+    print(table(rows, ROLE_HEADERS))
     print(f"\n{bi('written', 'записано')}: {path}")
     print(
         "edit the order by hand if wrong: it is the fallback chain"
@@ -398,7 +417,7 @@ def _cmd_quota(as_json: bool) -> int:
         ]
         for pid, w in sorted(windows.items())
     ]
-    print(table(rows, ["провайдер", "окно", "сожжено", "состояние", "закроется"]))
+    print(table(rows, QUOTA_HEADERS))
     if not windows:
         print(bi("\nno manifest declares window_h", "ни один манифест не объявил window_h"))
     return int(Exit.OK)
@@ -441,7 +460,7 @@ def _cmd_burn(args: argparse.Namespace) -> int:
         [w.provider, t.capability, t.input, w.resets_at.strftime("%H:%M") if w.resets_at else "-"]
         for w, t in pairs
     ]
-    print(table(rows, ["окно", "capability", "вход", "закроется"]))
+    print(table(rows, BURN_HEADERS))
 
     if not args.yes:
         print(bi("\nthis is a proposal, add --yes to run", "запуск с --yes"))
@@ -491,17 +510,26 @@ def _cmd_recipe(args: argparse.Namespace) -> int:
             ]
             for r in sorted(catalog.recipes.values(), key=lambda r: r.id)
         ]
-        print(table(rows, ["рецепт", "описание", "шаги"]))
+        print(table(rows, RECIPE_HEADERS))
         return int(Exit.OK)
 
     registry = _load_registry()
     recipe = catalog.recipes.get(args.recipe_id)
     if recipe is None:
         known = ", ".join(sorted(catalog.recipes)) or "ни одного"
-        raise NnError(Exit.BAD_DATA, f"рецепта {args.recipe_id} нет (есть: {known})")
+        raise NnError(
+            Exit.BAD_DATA,
+            bi(
+                f"recipe {args.recipe_id} does not exist (available: {known})",
+                f"рецепта {args.recipe_id} нет (есть: {known})",
+            ),
+        )
     source = Path(args.input)
     if not source.is_file():
-        raise NnError(Exit.BAD_IO, f"входной файл {source} не найден")
+        raise NnError(
+            Exit.BAD_IO,
+            bi(f"input file {source} not found", f"входной файл {source} не найден"),
+        )
 
     results = run_recipe(
         recipe,
@@ -534,8 +562,6 @@ def _cmd_doctor(as_json: bool) -> int:
     if as_json:
         print(json.dumps([asdict(f) for f in findings], ensure_ascii=False, indent=2))
     else:
-        from nn.report import DOCTOR_HEADERS
-
         rows = [[f.severity, f.subject, f.message] for f in findings]
         print(table(rows, DOCTOR_HEADERS))
     return int(Exit.BAD_DATA) if any(f.severity == "error" for f in findings) else int(Exit.OK)

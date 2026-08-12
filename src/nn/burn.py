@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from nn.errors import Exit, NnError
+from nn.i18n import bi
 from nn.paths import state_dir
 from nn.quota import Window
 
@@ -28,7 +29,13 @@ def queue_path() -> Path:
 
 def enqueue(task: BurnTask) -> None:
     if not Path(task.input).expanduser().is_file():
-        raise NnError(Exit.BAD_IO, f"вход {task.input} не найден — в очередь не кладу")
+        raise NnError(
+            Exit.BAD_IO,
+            bi(
+                f"input {task.input} not found, not queueing it",
+                f"вход {task.input} не найден — в очередь не кладу",
+            ),
+        )
     with queue_path().open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(asdict(task), ensure_ascii=False) + "\n")
 

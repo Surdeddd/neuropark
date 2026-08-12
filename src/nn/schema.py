@@ -13,7 +13,13 @@ OS_KEYS = {"", "darwin", "linux", "win"}
 
 
 def _bad(source: str, what: str) -> NnError:
-    return NnError(Exit.BAD_DATA, f"{source}: некорректное поле {what}")
+    return NnError(
+        Exit.BAD_DATA,
+        bi(
+            f"{source}: invalid field {what}",
+            f"{source}: некорректное поле {what}",
+        ),
+    )
 
 
 def _templates(raw: Any, source: str, field: str) -> dict[str, str]:

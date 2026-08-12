@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from nn.errors import Exit, NnError
+from nn.i18n import bi
 from nn.paths import state_dir
 
 BUSY_MARKERS = ("rebase-merge", "rebase-apply", "MERGE_HEAD", "CHERRY_PICK_HEAD")
@@ -45,18 +46,33 @@ def ensure_ready(repo: Path) -> None:
     """Репозиторий должен быть git и не в середине rebase/merge."""
     code, out, _ = _git(["rev-parse", "--git-dir"], cwd=repo)
     if code != 0:
-        raise NnError(Exit.PROVIDER_FAILED, f"{repo} не git-репозиторий — worktree не создать")
+        raise NnError(
+            Exit.PROVIDER_FAILED,
+            bi(
+                f"{repo} is not a git repository, cannot create a worktree",
+                f"{repo} не git-репозиторий — worktree не создать",
+            ),
+        )
     raw = Path(out.strip())
     git_dir = raw if raw.is_absolute() else (repo / raw).resolve()
     for marker in BUSY_MARKERS:
         if (git_dir / marker).exists():
             raise NnError(
                 Exit.PROVIDER_FAILED,
-                f"репозиторий в состоянии {marker} — сначала доведи операцию до конца",
+                bi(
+                    f"repository is mid-{marker}, finish that operation first",
+                    f"репозиторий в состоянии {marker} — сначала доведи операцию",
+                ),
             )
     code, _, _ = _git(["rev-parse", "HEAD"], cwd=repo)
     if code != 0:
-        raise NnError(Exit.PROVIDER_FAILED, f"{repo}: нет ни одного коммита, worktree не от чего")
+        raise NnError(
+            Exit.PROVIDER_FAILED,
+            bi(
+                f"{repo}: no commits yet, nothing to branch a worktree from",
+                f"{repo}: нет ни одного коммита, worktree не от чего",
+            ),
+        )
 
 
 def create(repo: Path, run_id: str) -> Path:
@@ -64,7 +80,13 @@ def create(repo: Path, run_id: str) -> Path:
     path = worktrees_dir() / run_id
     code, _, err = _git(["worktree", "add", str(path), "HEAD", "--detach"], cwd=repo)
     if code != 0:
-        raise NnError(Exit.PROVIDER_FAILED, f"не удалось создать worktree: {err.strip()}")
+        raise NnError(
+            Exit.PROVIDER_FAILED,
+            bi(
+                f"could not create the worktree: {err.strip()}",
+                f"не удалось создать worktree: {err.strip()}",
+            ),
+        )
     return path
 
 
@@ -72,10 +94,22 @@ def extract_patch(repo: Path, worktree: Path, run_id: str) -> Path | None:
     """Патч всего, что изменилось в worktree. None — если изменений нет."""
     code, _, err = _git(["add", "-A"], cwd=worktree)
     if code != 0:
-        raise NnError(Exit.PROVIDER_FAILED, f"git add в worktree упал: {err.strip()}")
+        raise NnError(
+            Exit.PROVIDER_FAILED,
+            bi(
+                f"git add failed in the worktree: {err.strip()}",
+                f"git add в worktree упал: {err.strip()}",
+            ),
+        )
     code, diff, err = _git(["diff", "--cached", "HEAD"], cwd=worktree)
     if code != 0:
-        raise NnError(Exit.PROVIDER_FAILED, f"git diff в worktree упал: {err.strip()}")
+        raise NnError(
+            Exit.PROVIDER_FAILED,
+            bi(
+                f"git diff failed in the worktree: {err.strip()}",
+                f"git diff в worktree упал: {err.strip()}",
+            ),
+        )
     if not diff.strip():
         return None
     path = state_dir() / "out" / f"{run_id}.patch"

@@ -73,6 +73,7 @@ def run_detect(
     requires_key: tuple[str, ...] = (),
     env: Mapping[str, str] | None = None,
     runner: Runner = shell_runner,
+    interpreter: str | None = None,
 ) -> DetectResult:
     environ = os.environ if env is None else env
     for key in requires_key:
@@ -117,7 +118,8 @@ def run_detect(
 
     module = spec.get("python")
     if module:
-        code, _, _ = runner(f'python3 -c "import {module}"', timeout=15)
+        python = interpreter or "python3"
+        code, _, _ = runner(f'{python} -c "import {module}"', timeout=15)
         if code != 0:
             return DetectResult(
                 "missing",

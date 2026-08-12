@@ -43,9 +43,14 @@ def _read(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise NnError(Exit.BAD_DATA, f"{path}: невалидный JSON — {exc}") from exc
+        raise NnError(
+            Exit.BAD_DATA, bi(f"{path}: invalid JSON — {exc}", f"{path}: невалидный JSON — {exc}")
+        ) from exc
     if not isinstance(payload, dict):
-        raise NnError(Exit.BAD_DATA, f"{path}: ожидался объект JSON")
+        raise NnError(
+            Exit.BAD_DATA,
+            bi(f"{path}: a JSON object was expected", f"{path}: ожидался объект JSON"),
+        )
     return payload
 
 
@@ -57,9 +62,17 @@ def _load_dir(root: Path, sub: str, parse: Callable[..., T]) -> dict[str, T]:
     for path in sorted(directory.glob("*.json")):
         item = parse(_read(path), source=str(path.relative_to(root)))
         if item.id != path.stem:
-            raise NnError(Exit.BAD_DATA, f"{path}: имя файла не совпадает с id ({item.id})")
+            raise NnError(
+                Exit.BAD_DATA,
+                bi(
+                    f"{path}: file name does not match id ({item.id})",
+                    f"{path}: имя файла не совпадает с id ({item.id})",
+                ),
+            )
         if item.id in out:
-            raise NnError(Exit.BAD_DATA, f"{path}: дубль id {item.id}")
+            raise NnError(
+                Exit.BAD_DATA, bi(f"{path}: duplicate id {item.id}", f"{path}: дубль id {item.id}")
+            )
         out[item.id] = item
     return out
 
@@ -68,7 +81,7 @@ def load_catalog(root: Path | None = None) -> Catalog:
     base = root or data_dir()
     caps_path = base / "capabilities.json"
     if not caps_path.is_file():
-        raise NnError(Exit.BAD_DATA, f"{caps_path} отсутствует")
+        raise NnError(Exit.BAD_DATA, bi(f"{caps_path} is missing", f"{caps_path} отсутствует"))
     caps, types = parse_capabilities(_read(caps_path))
     hosts = _load_dir(base, "hosts", parse_host)
     if "local" not in hosts:

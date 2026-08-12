@@ -106,7 +106,7 @@ def test_garbage_reference_is_bad_data():
     assert err.value.code == Exit.BAD_DATA
 
 
-def test_role_steps_are_deferred_to_phase_five(monkeypatch, tmp_path):
+def test_role_steps_are_not_supported_yet(monkeypatch, tmp_path):
     monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
     source = tmp_path / "a.wav"
     source.write_bytes(b"\x00")
@@ -114,7 +114,7 @@ def test_role_steps_are_deferred_to_phase_five(monkeypatch, tmp_path):
     recipe = Recipe(id="r", description="", steps=(Step(role="core"),))
     with pytest.raises(NnError) as err:
         run_recipe(recipe, catalog=catalog, registry=registry, input_path=str(source))
-    assert "фазе 5" in err.value.message
+    assert "не поддержаны" in err.value.message
 
 
 def test_step_can_pin_input_to_original(monkeypatch, tmp_path):

@@ -119,6 +119,36 @@ def test_bridge_inserted_when_input_type_mismatches():
     assert choice.bridge.id == "video-to-audio"
 
 
+def test_exit_code_does_not_depend_on_language(monkeypatch):
+    """Регрессия: код выхода выбирался сравнением причины с русской подстрокой,
+    поэтому в английском режиме BAD_IO превращался в NO_PROVIDER."""
+    catalog, registry = build([prov("audio-only", io_in=("audio",))])
+    codes = set()
+    for language in ("ru", "en"):
+        monkeypatch.setenv("NN_LANG", language)
+        with pytest.raises(NnError) as err:
+            resolve("transcribe", catalog=catalog, registry=registry, in_type="video")
+        codes.add(err.value.code)
+    assert codes == {Exit.BAD_IO}
+
+
+def test_rejection_carries_structured_code(monkeypatch):
+    from nn.resolve import NO_BRIDGE, QUOTA_BLOCKED
+
+    monkeypatch.setenv("NN_LANG", "en")
+    catalog, registry = build([prov("a", rank=9), prov("b", rank=1)])
+    choice = resolve(
+        "transcribe",
+        catalog=catalog,
+        registry=registry,
+        in_type="audio",
+        exhausted=frozenset({"a"}),
+        allow_fallback=True,
+    )
+    assert any(r.code == QUOTA_BLOCKED for r in choice.rejected)
+    assert NO_BRIDGE != QUOTA_BLOCKED
+
+
 def test_no_bridge_means_bad_io():
     catalog, registry = build([prov("audio-only", io_in=("audio",))])
     with pytest.raises(NnError) as err:

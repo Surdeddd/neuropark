@@ -7,8 +7,15 @@ from datetime import UTC, datetime
 from nn.catalog import Catalog
 from nn.detect import Runner, run_detect, shell_runner
 from nn.i18n import bi
-from nn.model import Host
+from nn.model import Host, Provider
+from nn.paths import expand
 from nn.registry import Entry, Registry, hostname
+
+
+def _interpreter_of(provider: Provider) -> str | None:
+    """Питон провайдера, если манифест закрепил свой в vars.py."""
+    raw = provider.vars.get("py")
+    return expand(raw) if raw else None
 
 
 def _host_reachable(host: Host, runner: Runner) -> bool:
@@ -68,6 +75,7 @@ def scan(
             requires_key=provider.requires_key,
             env=merged_env,
             runner=runner,
+            interpreter=_interpreter_of(provider),
         )
         version: str | None = None
         if result.status == "ok" and provider.version_cmd:

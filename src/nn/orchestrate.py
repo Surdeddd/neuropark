@@ -46,7 +46,7 @@ def _read_output(envelope: Envelope) -> str:
 
 def _role_for(stage: str, work_role: str) -> str:
     if stage not in STAGE_ROLES:
-        raise NnError(Exit.BAD_DATA, f"неизвестная стадия {stage}")
+        raise NnError(Exit.BAD_DATA, bi(f"unknown stage {stage}", f"неизвестная стадия {stage}"))
     return work_role if stage == "work" else STAGE_ROLES[stage]
 
 
@@ -57,33 +57,48 @@ def _prompt_for(stage: str, task: str, spec: str, patches: list[str], reviews: l
     spec (например quick) исполнитель получал пустую спеку и не понимал, что от
     него хотят — ловилось только живым прогоном 2026-08-12.
     """
-    head = f"Задача: {task}"
-    spec_block = f"\n\nСпека:\n{spec}" if spec.strip() else ""
+    head = f"{bi('Task', 'Задача')}: {task}"
+    spec_word = bi("Spec", "Спека")
+    spec_block = f"\n\n{spec_word}:\n{spec}" if spec.strip() else ""
 
     if stage == "spec":
-        return (
-            f"{head}\n\n"
+        return f"{head}\n\n" + bi(
+            "Write a strict 10-15 line spec: goal, input and output, edge cases,"
+            " definition of done. No implementation, no code.",
             "Составь строгую спеку на 10-15 строк: цель, вход и выход, крайние случаи,"
-            " критерий готовности. Без реализации, без кода."
+            " критерий готовности. Без реализации, без кода.",
         )
     if stage == "work":
-        return (
-            f"{head}{spec_block}\n\n"
+        return f"{head}{spec_block}\n\n" + bi(
+            "Implement this in the current working directory: edit files directly."
+            " Do not ask for confirmation, do not create commits.",
             "Реализуй это в текущем рабочем каталоге: меняй файлы напрямую."
-            " Не спрашивай подтверждений, не создавай коммитов."
+            " Не спрашивай подтверждений, не создавай коммитов.",
         )
     if stage == "cross-review":
-        joined = "\n\n---\n\n".join(patches) or "(патча нет — так и скажи в ревью)"
-        return (
-            f"{head}{spec_block}\n\nПатч:\n{joined}\n\n"
-            "Отревьюй: что расходится с задачей, где баги, чего не хватает. Коротко и по делу."
+        joined = "\n\n---\n\n".join(patches) or bi(
+            "(no patch — say so in the review)", "(патча нет — так и скажи в ревью)"
         )
-    reviews_text = "\n\n---\n\n".join(reviews) or "(ревью не было)"
-    patch_text = "\n\n---\n\n".join(patches) or "(патча нет — так и скажи в вердикте)"
+        patch_word = bi("Patch", "Патч")
+        return f"{head}{spec_block}\n\n{patch_word}:\n{joined}\n\n" + bi(
+            "Review it: what diverges from the task, where the bugs are, what is missing."
+            " Short and to the point.",
+            "Отревьюй: что расходится с задачей, где баги, чего не хватает. Коротко и по делу.",
+        )
+    reviews_text = "\n\n---\n\n".join(reviews) or bi("(no review)", "(ревью не было)")
+    patch_text = "\n\n---\n\n".join(patches) or bi(
+        "(no patch — say so in the verdict)", "(патча нет — так и скажи в вердикте)"
+    )
+    patches_word = bi("Patches", "Патчи")
+    reviews_word = bi("Reviews", "Ревью")
     return (
-        f"{head}{spec_block}\n\nПатчи:\n{patch_text}\n\nРевью:\n{reviews_text}\n\n"
+        f"{head}{spec_block}\n\n{patches_word}:\n{patch_text}"
+        f"\n\n{reviews_word}:\n{reviews_text}\n\n"
+    ) + bi(
+        "Verdict: which patch to take, what to rework, what is missing."
+        " Do not apply anything and do not commit.",
         "Вердикт: какой патч брать, что доработать, чего не хватает."
-        " Ничего не применяй и не коммить."
+        " Ничего не применяй и не коммить.",
     )
 
 
@@ -145,7 +160,13 @@ def orchestrate(
     stages = catalog.roles.patterns.get(pattern, DEFAULT_PATTERN if pattern == "default" else ())
     if not stages:
         known = ", ".join(sorted(catalog.roles.patterns)) or "только default"
-        raise NnError(Exit.BAD_DATA, f"паттерн {pattern} не описан (есть: {known})")
+        raise NnError(
+            Exit.BAD_DATA,
+            bi(
+                f"pattern {pattern} is not described (available: {known})",
+                f"паттерн {pattern} не описан (есть: {known})",
+            ),
+        )
 
     results: list[StageResult] = []
     spec_text = ""
@@ -157,7 +178,13 @@ def orchestrate(
         role_name = _role_for(stage, work_role)
         role = catalog.roles.roles.get(role_name)
         if role is None:
-            raise NnError(Exit.NO_PROVIDER, f"роль {role_name} для стадии {stage} не описана")
+            raise NnError(
+                Exit.NO_PROVIDER,
+                bi(
+                    f"role {role_name} for stage {stage} is not described",
+                    f"роль {role_name} для стадии {stage} не описана",
+                ),
+            )
 
         prompt = _prompt_for(stage, task, spec_text, patches, reviews)
 

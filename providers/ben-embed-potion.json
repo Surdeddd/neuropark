@@ -5,9 +5,14 @@
   "rank": 10,
   "detect": {
     "files": [
-      "~/scripts/ben-embed.py"
+      "~/scripts/ben-embed.py",
+      "~/scripts/.venv-ben-embed/bin/python3"
     ],
-    "bin": "jq"
+    "bin": "jq",
+    "python": "model2vec"
+  },
+  "vars": {
+    "py": "~/scripts/.venv-ben-embed/bin/python3"
   },
   "io": {
     "in": [
@@ -15,10 +20,10 @@
     ],
     "out": "json"
   },
-  "run": "jq -Rs '[.]' {in} | python3 ~/scripts/ben-embed.py > {out}",
+  "run": "jq -Rs '[.]' {in} | {py} ~/scripts/ben-embed.py > {out}",
   "timeout_s": 300,
   "notes": {
-    "en": "potion-multilingual-128M, offline. Contract: stdin is a JSON array of strings, stdout is an array of vectors",
-    "ru": "potion-multilingual-128M, офлайн. контракт: stdin — JSON-массив строк, stdout — массив векторов"
+    "en": "potion-multilingual-128M, offline. Contract: stdin is a JSON array of strings, stdout is an array of vectors. ONLY with the .venv-ben-embed interpreter: the system python3 has no model2vec. A warm daemon com.maxim.ben-embed-daemon also exists",
+    "ru": "potion-multilingual-128M, офлайн. Контракт: stdin — JSON-массив строк, stdout — массив векторов. ТОЛЬКО интерпретатором из .venv-ben-embed: у системного python3 нет model2vec. Для тёплых прогонов есть демон com.maxim.ben-embed-daemon"
   }
 }

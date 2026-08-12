@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from nn.errors import Exit, NnError
+from nn.i18n import bi
 
 _ENV_RE = re.compile(r"\$(\w+)")
 
@@ -31,7 +32,13 @@ def expand(value: str, *, env: Mapping[str, str] | None = None) -> str:
         name = match.group(1)
         got = source.get(name)
         if not got:
-            raise NnError(Exit.BAD_DATA, f"переменная окружения {name} не задана или пуста")
+            raise NnError(
+                Exit.BAD_DATA,
+                bi(
+                    f"env variable {name} is unset or empty",
+                    f"переменная окружения {name} не задана или пуста",
+                ),
+            )
         return got
 
     return str(Path(_ENV_RE.sub(sub, value)).expanduser())

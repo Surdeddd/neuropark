@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Protocol
 
 from nn.errors import Exit, NnError
+from nn.i18n import bi
 from nn.model import Host
 
 AT_FILE = "@file:"
@@ -41,7 +42,10 @@ def resolve_env(host: Host, base: Mapping[str, str]) -> dict[str, str]:
             if not path.is_file():
                 raise NnError(
                     Exit.BAD_DATA,
-                    f"host {host.id}: файл секрета {path} отсутствует (env {key})",
+                    bi(
+                        f"host {host.id}: secret file {path} is missing (env {key})",
+                        f"host {host.id}: файл секрета {path} отсутствует (env {key})",
+                    ),
                 )
             merged[key] = path.read_text(encoding="utf-8").strip()
         else:

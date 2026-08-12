@@ -6,6 +6,7 @@ from datetime import datetime
 
 from nn.catalog import Catalog
 from nn.errors import Exit, NnError
+from nn.i18n import bi
 from nn.iotypes import type_of
 from nn.model import Recipe, Step
 from nn.registry import Registry
@@ -27,23 +28,42 @@ def resolve_ref(ref: str, *, input_path: str, done: list[StepResult], current_in
         return input_path
     match = STEP_REF.match(ref)
     if not match:
-        raise NnError(Exit.BAD_DATA, f"непонятная ссылка на вход: {ref}")
+        raise NnError(
+            Exit.BAD_DATA,
+            bi(f"unclear input reference: {ref}", f"непонятная ссылка на вход: {ref}"),
+        )
     index = int(match.group(1))
     if index >= current_index:
         raise NnError(
             Exit.BAD_DATA,
-            f"ссылка {ref} смотрит вперёд: шаг {current_index} не может ждать шаг {index}",
+            bi(
+                f"reference {ref} points forward: step {current_index}"
+                f" cannot wait for step {index}",
+                f"ссылка {ref} смотрит вперёд: шаг {current_index} не может ждать шаг {index}",
+            ),
         )
     for result in done:
         if result.index == index and result.envelope.out:
             return result.envelope.out
-    raise NnError(Exit.BAD_DATA, f"ссылка {ref}: у шага {index} нет выхода")
+    raise NnError(
+        Exit.BAD_DATA,
+        bi(
+            f"reference {ref}: step {index} has no output",
+            f"ссылка {ref}: у шага {index} нет выхода",
+        ),
+    )
 
 
 def _capability_of(step: Step) -> str:
     if step.capability:
         return step.capability
-    raise NnError(Exit.BAD_DATA, "шаги с role появятся в фазе 5 — пока используй capability")
+    raise NnError(
+        Exit.BAD_DATA,
+        bi(
+            "role steps are not supported yet, use capability",
+            "шаги с role пока не поддержаны — используй capability",
+        ),
+    )
 
 
 def run_recipe(

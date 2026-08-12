@@ -14,11 +14,16 @@ from nn.model import Bridge, Host, Provider
 from nn.registry import Registry
 from nn.render import pick
 
+NO_BRIDGE = "no-bridge"
+QUOTA_BLOCKED = "quota"
+OTHER = "other"
+
 
 @dataclass(frozen=True)
 class Rejection:
     provider: str
     reason: str
+    code: str = OTHER
 
 
 @dataclass(frozen=True)
@@ -72,8 +77,14 @@ def resolve_role(
     """
     role = catalog.roles.roles.get(role_name)
     if role is None:
-        known = ", ".join(sorted(catalog.roles.roles)) or "ни одной"
-        raise NnError(Exit.NO_PROVIDER, f"роль {role_name} не описана (есть: {known})")
+        known = ", ".join(sorted(catalog.roles.roles)) or bi("none", "ни одной")
+        raise NnError(
+            Exit.NO_PROVIDER,
+            bi(
+                f"role {role_name} is not described (available: {known})",
+                f"роль {role_name} не описана (есть: {known})",
+            ),
+        )
 
     rejected: list[Rejection] = []
     for provider_id in role.providers:
@@ -94,7 +105,11 @@ def resolve_role(
             continue
         if provider_id in exhausted:
             rejected.append(
-                Rejection(provider_id, bi("quota window exhausted", "окно квоты исчерпано"))
+                Rejection(
+                    provider_id,
+                    bi("quota window exhausted", "окно квоты исчерпано"),
+                    code=QUOTA_BLOCKED,
+                )
             )
             continue
         host = catalog.hosts.get(provider.host)
@@ -108,7 +123,7 @@ def resolve_role(
             continue
         entry = registry.get(provider_id)
         if entry is None or entry.status != "ok":
-            status = entry.status if entry else "нет в реестре"
+            status = entry.status if entry else bi("absent from registry", "нет в реестре")
             rejected.append(Rejection(provider_id, bi(f"status: {status}", f"статус: {status}")))
             continue
         if not provider.adapter and pick(provider.run, system=system) is None:
@@ -128,8 +143,15 @@ def resolve_role(
             rejected=tuple(rejected),
         )
 
-    summary = "; ".join(f"{r.provider}: {r.reason}" for r in rejected) or "цепочка пуста"
-    raise NnError(Exit.NO_PROVIDER, f"под роль {role_name} никого не нашлось — {summary}")
+    empty_chain = bi("chain is empty", "цепочка пуста")
+    summary = "; ".join(f"{r.provider}: {r.reason}" for r in rejected) or empty_chain
+    raise NnError(
+        Exit.NO_PROVIDER,
+        bi(
+            f"nobody found for role {role_name} — {summary}",
+            f"под роль {role_name} никого не нашлось — {summary}",
+        ),
+    )
 
 
 def resolve(
@@ -156,7 +178,10 @@ def resolve(
         if not pool:
             raise NnError(
                 Exit.NO_PROVIDER,
-                f"провайдер {pin} не найден среди умеющих {capability}",
+                bi(
+                    f"provider {pin} is not among those doing {capability}",
+                    f"провайдер {pin} не найден среди умеющих {capability}",
+                ),
             )
 
     for provider in sorted(pool, key=lambda p: p.id):
@@ -207,18 +232,30 @@ def resolve(
                             f"accepts {list(provider.io_in)}, input is {in_type}, no bridge",
                             f"принимает {list(provider.io_in)}, вход {in_type}, мостика нет",
                         ),
+                        code=NO_BRIDGE,
                     )
                 )
                 continue
         candidates.append((provider, host, bridge))
 
     if not candidates:
-        summary = "; ".join(f"{r.provider}: {r.reason}" for r in rejected) or "кандидатов нет"
-        if rejected and all("мостика нет" in r.reason for r in rejected):
+        nothing = bi("no candidates", "кандидатов нет")
+        summary = "; ".join(f"{r.provider}: {r.reason}" for r in rejected) or nothing
+        if rejected and all(r.code == NO_BRIDGE for r in rejected):
             raise NnError(
-                Exit.BAD_IO, f"{capability}: вход {in_type} никем не принимается — {summary}"
+                Exit.BAD_IO,
+                bi(
+                    f"{capability}: input {in_type} is accepted by nobody — {summary}",
+                    f"{capability}: вход {in_type} никем не принимается — {summary}",
+                ),
             )
-        raise NnError(Exit.NO_PROVIDER, f"нет доступного провайдера для {capability} — {summary}")
+        raise NnError(
+            Exit.NO_PROVIDER,
+            bi(
+                f"no available provider for {capability} — {summary}",
+                f"нет доступного провайдера для {capability} — {summary}",
+            ),
+        )
 
     ranked = sorted(candidates, key=lambda item: _sort_key(item[0], item[1], recent))
 
@@ -235,22 +272,35 @@ def resolve(
                                 "quota window exhausted, next one taken",
                                 "окно квоты исчерпано, взят следующий",
                             ),
+                            code=QUOTA_BLOCKED,
                         )
                     )
             if not fresh:
                 raise NnError(
                     Exit.QUOTA,
-                    f"все провайдеры {capability} исчерпали окно: {', '.join(quota_blocked)}",
+                    bi(
+                        f"all {capability} providers exhausted their window:"
+                        f" {', '.join(quota_blocked)}",
+                        f"все провайдеры {capability} исчерпали окно: {', '.join(quota_blocked)}",
+                    ),
                 )
             ranked = fresh
         elif ranked[0][0].id in exhausted:
             spare = [item[0].id for item in ranked[1:] if item[0].id not in exhausted]
             hint = (
-                f"живая альтернатива: {spare[0]}, повтори с --fallback" if spare else "замены нет"
+                bi(
+                    f"live alternative: {spare[0]}, retry with --fallback",
+                    f"живая альтернатива: {spare[0]}, повтори с --fallback",
+                )
+                if spare
+                else bi("no replacement", "замены нет")
             )
             raise NnError(
                 Exit.QUOTA,
-                f"{ranked[0][0].id} исчерпал окно квоты для {capability}. {hint}",
+                bi(
+                    f"{ranked[0][0].id} exhausted the quota window for {capability}. {hint}",
+                    f"{ranked[0][0].id} исчерпал окно квоты для {capability}. {hint}",
+                ),
             )
 
     provider, host, bridge = ranked[0]

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from nn.errors import Exit, NnError
+from nn.i18n import bi
 from nn.paths import state_dir
 
 
@@ -56,7 +57,13 @@ def save(reg: Registry) -> Path:
 def load(host: str | None = None) -> Registry:
     path = registry_path(host)
     if not path.is_file():
-        raise NnError(Exit.REGISTRY_STALE, f"реестра {path.name} нет — сделай nn scan")
+        raise NnError(
+            Exit.REGISTRY_STALE,
+            bi(
+                f"registry {path.name} is missing, run nn scan",
+                f"реестра {path.name} нет — сделай nn scan",
+            ),
+        )
     payload = json.loads(path.read_text(encoding="utf-8"))
     return Registry(
         hostname=str(payload["hostname"]),

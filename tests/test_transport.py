@@ -70,7 +70,8 @@ def test_ssh_transport_not_available_yet():
     with pytest.raises(NnError) as err:
         get_transport(host)
     assert err.value.code == Exit.BAD_DATA
-    assert "фазе 6" in err.value.message
+    assert "не реализован" in err.value.message
+    assert "auto: false" in err.value.message
 
 
 def test_resolve_env_reads_at_file(tmp_path):

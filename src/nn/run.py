@@ -9,6 +9,7 @@ from pathlib import Path
 from nn.catalog import Catalog
 from nn.dossier import instructions_for
 from nn.errors import Exit, NnError
+from nn.i18n import bi
 from nn.iotypes import ext_for
 from nn.outcome import classify
 from nn.paths import state_dir
@@ -82,7 +83,13 @@ def execute(
 ) -> Envelope:
     provider = choice.provider
     if provider.adapter:
-        raise NnError(Exit.BAD_DATA, "adapter-провайдеры появятся в фазе 5")
+        raise NnError(
+            Exit.BAD_DATA,
+            bi(
+                "adapter providers are not supported yet",
+                "adapter-провайдеры пока не поддержаны",
+            ),
+        )
 
     moment = now or datetime.now(UTC)
     run_id = f"{int(moment.timestamp())}-{provider.id}"
@@ -114,7 +121,13 @@ def execute(
         bridge_out = f"{tmp_prefix}-bridge.{bridge.out_ext}"
         template = pick(bridge.run)
         if template is None:
-            raise NnError(Exit.BAD_DATA, f"мостик {bridge.id}: нет шаблона под текущую ОС")
+            raise NnError(
+                Exit.BAD_DATA,
+                bi(
+                    f"bridge {bridge.id}: no template for this OS",
+                    f"мостик {bridge.id}: нет шаблона под текущую ОС",
+                ),
+            )
         command = render(template, {"in": source_path, "out": bridge_out, "tmp": tmp_prefix})
         result = transport.execute(
             command, host=choice.host, timeout_s=BRIDGE_TIMEOUT_S, work_dir=work, env=env_vars

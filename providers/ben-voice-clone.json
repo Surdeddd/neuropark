@@ -7,7 +7,8 @@
     "files": [
       "~/scripts/ben-voice.py",
       "~/Projects/Tools/qwen3-tts-apple-silicon/.venv/bin/python"
-    ]
+    ],
+    "python": "mlx_audio"
   },
   "vars": {
     "py": "~/Projects/Tools/qwen3-tts-apple-silicon/.venv/bin/python"
