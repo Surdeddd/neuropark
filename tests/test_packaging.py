@@ -5,6 +5,8 @@ import re
 import subprocess
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -85,9 +87,14 @@ def test_readme_exists_in_both_languages():
 
 
 def test_memory_bank_follows_canonical_structure():
-    """Каноническая структура Cline: шесть файлов с иерархией зависимостей."""
+    """Каноническая структура Cline: шесть файлов с иерархией зависимостей.
+
+    Банк локальный и лежит в .gitignore, поэтому на свежем клоне его нет —
+    тогда проверять нечего. Если он есть, структура обязана быть канонической.
+    """
     bank = ROOT / "MEMORY_BANK"
-    assert bank.is_dir()
+    if not bank.is_dir():
+        pytest.skip("MEMORY_BANK локальный и в .gitignore — на клоне отсутствует")
     required = {
         "projectbrief.md",
         "productContext.md",
