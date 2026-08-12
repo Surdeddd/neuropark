@@ -127,11 +127,16 @@ jobs:
             echo "PasswordAuthentication no"
             echo "PidFile $dir/sshd.pid"
           } > "$dir/sshd_config"
-          sudo /usr/sbin/sshd -f "$dir/sshd_config" -E "$dir/sshd.log"
+          # Без /run/sshd приватное разделение не поднимается и sshd молча уходит с 255.
+          sudo mkdir -p /run/sshd
+          sudo /usr/sbin/sshd -t -f "$dir/sshd_config"
+          sudo /usr/sbin/sshd -f "$dir/sshd_config" -E "$dir/sshd.log" \
+            || { echo "sshd refused to start:"; sudo cat "$dir/sshd.log" || true; exit 1; }
           for _ in $(seq 1 20); do
             nc -z 127.0.0.1 2222 && break
             sleep 0.5
           done
+          nc -z 127.0.0.1 2222 || { echo "port never opened:"; sudo cat "$dir/sshd.log"; exit 1; }
           ssh-keyscan -p 2222 -t ed25519 127.0.0.1 > "$dir/known_hosts" 2>/dev/null
           ssh -p 2222 -i "$dir/clientkey" -o BatchMode=yes -o IdentitiesOnly=yes \
             -o UserKnownHostsFile="$dir/known_hosts" 127.0.0.1 true
