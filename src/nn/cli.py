@@ -8,8 +8,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from nn.catalog import Catalog, load_catalog
+from nn.dossier import learn, pending_count, should_auto_learn
 from nn.errors import Exit, NnError
 from nn.iotypes import check_extra, type_of
+from nn.paths import state_dir
 from nn.quota import compute, exhausted_set
 from nn.registry import Registry, is_expired, load, save
 from nn.report import LS_HEADERS, STATS_HEADERS, WHY_HEADERS, ls_rows, stats_rows, table, why_rows
@@ -50,7 +52,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="разрешить переход на следующего провайдера, если у лучшего исчерпано окно",
     )
 
+    run_cmd.add_argument(
+        "--no-dossier", action="store_true", help="не подмешивать накопленные уроки в промпт"
+    )
+
     subs.add_parser("quota", help="окна квот: сожжено, что простаивает")
+    subs.add_parser("learn", help="сжать новые исходы запусков в досье провайдеров")
 
     burn_cmd = subs.add_parser("burn", help="прожечь простаивающую квоту")
     burn_subs = burn_cmd.add_subparsers(dest="burn_command")
@@ -193,11 +200,39 @@ def _cmd_run(args: argparse.Namespace) -> int:
         extra=tuple(args.extra),
         prompt=args.prompt,
         retries=args.retries,
+        with_dossier=not args.no_dossier,
     )
     print(envelope.to_json())
     if envelope.status == "manual":
         print(f"\nвыполни вручную:\n{envelope.command}", file=sys.stderr)
+
+    # досье пополняется само, когда накопилось достаточно новых исходов
+    if should_auto_learn():
+        touched = learn()
+        if touched:
+            print(f"досье обновлены: {', '.join(touched)}", file=sys.stderr)
     return int(exit_code_for(envelope))
+
+
+def _cmd_learn(as_json: bool) -> int:
+    pending = pending_count()
+    touched = learn()
+    if as_json:
+        print(json.dumps({"providers": touched, "processed": pending}, ensure_ascii=False))
+        return int(Exit.OK)
+    if not touched and not pending:
+        print("новых исходов нет — досье не менялись")
+    elif not touched:
+        # различаем «нечего читать» и «прочитали, но до порога не дотянуло»
+        print(
+            f"обработано новых записей: {pending}. уроков не набралось —"
+            " пороги: 3 повтора одной подписи ошибки, 3 пустых ответа, 2 таймаута"
+        )
+    else:
+        print(f"досье обновлены: {', '.join(touched)}")
+        for provider in touched:
+            print(f"  {state_dir() / 'dossiers' / f'{provider}.md'}")
+    return int(Exit.OK)
 
 
 def _cmd_quota(as_json: bool) -> int:
@@ -370,6 +405,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_run(args)
         if args.command == "quota":
             return _cmd_quota(args.json)
+        if args.command == "learn":
+            return _cmd_learn(args.json)
         if args.command == "burn":
             return _cmd_burn(args)
         if args.command == "recipe":

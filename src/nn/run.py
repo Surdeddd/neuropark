@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from nn.catalog import Catalog
+from nn.dossier import instructions_for
 from nn.errors import Exit, NnError
 from nn.iotypes import ext_for
 from nn.outcome import classify
@@ -79,6 +80,7 @@ def execute(
     work_dir: str | None = None,
     retries: int = 1,
     now: datetime | None = None,
+    with_dossier: bool = True,
 ) -> Envelope:
     provider = choice.provider
     if provider.adapter:
@@ -96,8 +98,15 @@ def execute(
 
     prompt_file: str | None = None
     if prompt is not None:
+        body = prompt
+        if with_dossier:
+            # накопленные уроки по этому провайдеру идут в промпт первыми:
+            # досье заполняется само из runs.jsonl, засевать руками не нужно
+            advice = instructions_for(provider.id)
+            if advice:
+                body = f"Учти известные грабли этого инструмента:\n{advice}\n\n{prompt}"
         prompt_file = str(_out_dir() / f"{run_id}-prompt.txt")
-        Path(prompt_file).write_text(prompt, encoding="utf-8")
+        Path(prompt_file).write_text(body, encoding="utf-8")
 
     source_path = in_path
     bridge_id: str | None = None
