@@ -9,6 +9,7 @@ from pathlib import Path
 
 from nn.catalog import Catalog, load_catalog
 from nn.dossier import learn, pending_count, should_auto_learn
+from nn.drift import compare, format_drift
 from nn.errors import Exit, NnError
 from nn.iotypes import check_extra, type_of
 from nn.paths import state_dir
@@ -20,7 +21,7 @@ from nn.run import execute, exit_code_for
 from nn.runlog import last_success_map, read_all
 from nn.scan import scan
 
-VERSION = "0.1.0"
+VERSION = "0.6.0"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -118,14 +119,26 @@ def _cmd_scan(as_json: bool) -> int:
         previous = None
     registry = scan(catalog, previous=previous)
     path = save(registry)
+    drift = compare(previous, registry)
     counts: dict[str, int] = {}
     for entry in registry.entries.values():
         counts[entry.status] = counts.get(entry.status, 0) + 1
     if as_json:
-        print(json.dumps({"registry": str(path), "counts": counts}, ensure_ascii=False))
+        print(
+            json.dumps(
+                {
+                    "registry": str(path),
+                    "counts": counts,
+                    "drift": [asdict(item) for item in drift],
+                },
+                ensure_ascii=False,
+            )
+        )
     else:
         summary = ", ".join(f"{status}: {count}" for status, count in sorted(counts.items()))
         print(f"реестр записан: {path}\n{summary or 'провайдеров нет'}")
+        if drift:
+            print(f"\nизменения с прошлого скана:\n{format_drift(drift)}")
     return int(Exit.OK)
 
 

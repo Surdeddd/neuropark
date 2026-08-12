@@ -1,0 +1,8 @@
+{
+  "name": "neuropark",
+  "version": "0.6.0",
+  "description": "nn — каталог всех нейронок пользователя и единый контракт вызова: анализ парка на всех машинах плюс быстрая стыковка моделей между собой",
+  "author": "Surdeddd",
+  "license": "MIT",
+  "keywords": ["neural", "catalog", "orchestration", "media", "pipeline", "whisper", "tts", "comfyui"]
+}

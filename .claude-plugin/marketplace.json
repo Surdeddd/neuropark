@@ -1,0 +1,14 @@
+{
+  "name": "neuropark-marketplace",
+  "owner": {
+    "name": "Surdeddd",
+    "url": "https://github.com/Surdeddd"
+  },
+  "plugins": [
+    {
+      "name": "neuropark",
+      "source": "./",
+      "description": "nn — каталог парка нейронок и единый контракт вызова"
+    }
+  ]
+}
