@@ -34,6 +34,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · versioning: 
   with the number of strategies.
 - `nn doctor` warns about an `ssh` host that has no `PATH` in `env` (the top cause of a
   remote `command not found`) and about one with no `probe`.
+- A live test for a **recipe with two inputs** — a step taking `{input}` and an earlier
+  step's output at once — run through real ffmpeg, with ffprobe checking both streams
+  landed. The README had been claiming multi-input recipes were unimplemented while
+  `extra_in` worked; what is actually missing is a step naming a `role`.
 - **`nn scan` probes in parallel** — hosts first, then providers, eight at a time. Detects
   wait on subprocesses and network rather than compute: npm and brew take about a second
   each, an unreachable host burns its whole connect timeout. Measured on a park with three

@@ -328,7 +328,7 @@ Rules that hold: stdlib only at runtime · no `type: ignore` anywhere in `src` �
 
 Adding a tool needs no code from you — see [CONTRIBUTING.md](CONTRIBUTING.md). Release notes: [CHANGELOG.md](CHANGELOG.md).
 
-Not implemented, and saying so instead of failing silently: the `http` transport (such hosts print the command), `adapter` providers for tools that need a queue, recipes with multiple inputs.
+Not implemented, and saying so instead of failing silently: the `http` transport (such hosts print the command), `adapter` providers for tools that need a queue, and steps that name a `role` instead of a capability inside a recipe. Recipes with **several inputs do work** — a step can take `{input}` and an earlier step's output at once, and a live test runs exactly that through ffmpeg.
 
 ## License
 

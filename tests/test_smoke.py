@@ -1,6 +1,7 @@
 """Живые запуски на реальном железе, всё офлайн. Запуск: make smoke."""
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -113,3 +114,141 @@ def test_doctor_has_no_errors_on_real_catalog():
     error_lines = [line for line in out.splitlines() if line.startswith("error")]
     assert error_lines == [], "\n".join(error_lines)
     assert code == 0
+
+
+def make_silent_video(path: Path, seconds: int = 2) -> None:
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"testsrc=size=160x120:rate=10:duration={seconds}",
+            "-f",
+            "lavfi",
+            "-i",
+            f"anullsrc=channel_layout=mono:sample_rate=16000:duration={seconds}",
+            "-shortest",
+            "-pix_fmt",
+            "yuv420p",
+            str(path),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=120,
+    )
+
+
+def test_recipe_with_two_inputs_really_runs(tmp_path):
+    """Шаг, берущий и {input}, и выход прошлого шага — на настоящем ffmpeg.
+
+    README одно время утверждал, что рецепты с несколькими входами не реализованы,
+    хотя `extra_in` работал. Теперь это под живым тестом, а не под честным словом.
+    """
+    data = tmp_path / "data"
+    (data / "providers").mkdir(parents=True)
+    (data / "hosts").mkdir(parents=True)
+    (data / "recipes").mkdir(parents=True)
+
+    for name in ("ffmpeg-compose", "ffmpeg-audio-clean"):
+        source = REPO / "providers" / f"{name}.json"
+        if source.is_file():
+            (data / "providers" / f"{name}.json").write_text(
+                source.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+    (data / "hosts" / "local.json").write_text(
+        json.dumps({"id": "local", "kind": "local"}), encoding="utf-8"
+    )
+    (data / "capabilities.json").write_text(
+        (REPO / "capabilities.json").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    # Шаг 1 делает звук из видео, шаг 2 берёт видео из {input} и звук из шага 1.
+    (data / "providers" / "extract-audio.json").write_text(
+        json.dumps(
+            {
+                "id": "extract-audio",
+                "capability": "audio-clean",
+                "kind": "tool",
+                "rank": 99,
+                "detect": {"bin": "ffmpeg"},
+                "io": {"in": ["video", "audio"], "out": "audio"},
+                "run": "ffmpeg -nostdin -y -i {in} -vn -ar 16000 -ac 1 {out}",
+                "notes": {"en": "audio out of a video", "ru": "звук из видео"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (data / "recipes" / "reattach.json").write_text(
+        json.dumps(
+            {
+                "id": "reattach",
+                "description": {
+                    "en": "pull the audio out, then put it back on the original video",
+                    "ru": "вытащить звук и вернуть его на исходное видео",
+                },
+                "steps": [
+                    {"capability": "audio-clean", "provider": "extract-audio"},
+                    {
+                        "capability": "compose",
+                        "provider": "ffmpeg-compose",
+                        "in": "{input}",
+                        "extra_in": ["{step0.out}"],
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    clip = tmp_path / "clip.mp4"
+    make_silent_video(clip)
+
+    env = {"NN_DATA": str(data), "NN_STATE": str(tmp_path / "state"), "NN_LANG": "en"}
+    scan = subprocess.run(
+        [str(REPO / "bin" / "nn"), "scan"],
+        capture_output=True,
+        text=True,
+        timeout=600,
+        check=False,
+        env={**os.environ, **env},
+    )
+    assert scan.returncode == 0, scan.stderr
+
+    done = subprocess.run(
+        [str(REPO / "bin" / "nn"), "recipe", "run", "reattach", str(clip)],
+        capture_output=True,
+        text=True,
+        timeout=1800,
+        check=False,
+        env={**os.environ, **env},
+    )
+    assert done.returncode == 0, done.stdout + done.stderr
+
+    envelopes = json.loads(done.stdout)
+    assert len(envelopes) == 2, done.stdout
+    assert [e["outcome"] for e in envelopes] == ["success", "success"]
+
+    final = Path(envelopes[-1]["out"])
+    assert final.is_file() and final.stat().st_size > 1000, final
+
+    # У результата обязаны быть обе дорожки: значит второй вход дошёл.
+    probe = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_type",
+            "-of",
+            "csv=p=0",
+            str(final),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    kinds = [line.strip() for line in probe.stdout.splitlines() if line.strip()]
+    assert "video" in kinds and "audio" in kinds, probe.stdout
