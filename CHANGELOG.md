@@ -30,6 +30,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · versioning: 
   with the number of strategies.
 - `nn doctor` warns about an `ssh` host that has no `PATH` in `env` (the top cause of a
   remote `command not found`) and about one with no `probe`.
+- **`nn scan` probes in parallel** — hosts first, then providers, eight at a time. Detects
+  wait on subprocesses and network rather than compute: npm and brew take about a second
+  each, an unreachable host burns its whole connect timeout. Measured on a park with three
+  dead hosts and four slow detects: 10.6s serial → 3.6s. Registry order still follows the
+  catalog, not whoever answered first, so park drift stays meaningful.
+
+### Fixed (continued)
+
+- **One broken manifest blinded the whole park.** An `NnError` from variable expansion (a
+  `vars.py` pointing at an unset env variable, say) aborted the entire scan, leaving no
+  registry at all. That provider is now `missing` with the error as its reason, and the rest
+  of the park scans normally.
 
 ## 0.8.0 — 2026-08-12
 

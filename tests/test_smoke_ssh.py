@@ -289,7 +289,19 @@ def test_detection_happens_on_the_far_side_with_the_host_env(tmp_path, monkeypat
 
 
 def test_a_tool_absent_on_the_far_side_is_not_saved_by_local_presence(tmp_path, monkeypatch):
-    """Обратная сторона: локально инструмент есть, а на удалённом PATH его нет."""
+    """Обратная сторона: инструмент есть в моём PATH, а в PATH удалённого шелла — нет.
+
+    Инструмент создаётся тестом, а не берётся наугад из системы: раньше здесь
+    предполагалось, что рядом есть `uv`, и на чистом раннере тест падал не по делу.
+    """
+    near = tmp_path / "near-bin"
+    near.mkdir()
+    tool = near / "nn-local-only"
+    tool.write_text("#!/bin/sh\nprintf near\n", encoding="utf-8")
+    tool.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{near}:{os.environ['PATH']}")
+    assert shutil.which("nn-local-only") is not None, "локально он обязан находиться"
+
     data = tmp_path / "data"
     (data / "providers").mkdir(parents=True)
     (data / "hosts").mkdir(parents=True)
@@ -300,10 +312,10 @@ def test_a_tool_absent_on_the_far_side_is_not_saved_by_local_presence(tmp_path, 
                 "capability": "text",
                 "kind": "tool",
                 "host": "smokebox",
-                "detect": {"bin": "uv"},
+                "detect": {"bin": "nn-local-only"},
                 "io": {"in": ["text"], "out": "text"},
-                "run": "uv --version > {out}",
-                "notes": {"en": "here but maybe not there", "ru": "здесь есть, там может и нет"},
+                "run": "nn-local-only > {out}",
+                "notes": {"en": "here but not there", "ru": "здесь есть, там нет"},
             }
         ),
         encoding="utf-8",
@@ -329,13 +341,13 @@ def test_a_tool_absent_on_the_far_side_is_not_saved_by_local_presence(tmp_path, 
     monkeypatch.setenv("NN_DATA", str(data))
     monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
 
-    assert shutil.which("uv") is not None, "тест держится на том, что uv есть локально"
     assert main(["scan"]) == int(Exit.OK)
     registry = json.loads(
         next((tmp_path / "state").glob("registry.*.json")).read_text(encoding="utf-8")
     )
     entry = registry["entries"]["local-only"]
     assert entry["status"] == "missing", entry
+    assert "nn-local-only" in entry["reason"], entry
 
 
 def test_batched_detect_names_the_real_reason_over_live_ssh():

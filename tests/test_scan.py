@@ -1,7 +1,8 @@
+import time
 from datetime import UTC, datetime
 
 from nn.catalog import Catalog
-from nn.model import Host, Provider
+from nn.model import Capability, Host, Provider
 from nn.registry import Entry, Registry
 from nn.scan import scan
 
@@ -115,3 +116,166 @@ def test_host_probe_runs_once_per_host(monkeypatch, tmp_path):
         now=NOW,
     )
     assert calls.count("ssh remote-box true") == 1
+
+
+def _many_providers(count: int, host_id: str = "local") -> Catalog:
+    providers = {}
+    for index in range(count):
+        pid = f"p{index:02d}"
+        providers[pid] = Provider(
+            id=pid,
+            capability="text",
+            kind="tool",
+            # python-стратегия идёт через runner, а bin проверяется питоном локально:
+            # без этого фейковый runner в тестах вообще не звался.
+            detect={"python": f"mod{index}"},
+            io_in=("text",),
+            io_out="text",
+            notes="n",
+            source=f"{pid}.json",
+            host=host_id,
+            run={"": "true > {out}"},
+        )
+    return Catalog(
+        providers=providers,
+        hosts={host_id: Host(id=host_id, kind="local")},
+        capabilities={"text": Capability(name="text", in_types=("text",), out="text")},
+        types={"text": ("txt",)},
+        bridges={},
+        recipes={},
+    )
+
+
+def test_registry_order_follows_the_catalog_not_the_finish_line():
+    """Кто ответил первым, не должен менять порядок реестра: иначе дрейф врёт."""
+    import random
+
+    catalog = _many_providers(12)
+    delays = {f"mod{index}": (0.02 if index % 3 else 0.0) for index in range(12)}
+
+    def runner(command, *, timeout):
+        for name, pause in delays.items():
+            if name in command:
+                time.sleep(pause + random.random() / 200)
+        return (0, "", "")
+
+    first = scan(catalog, runner=runner, env={}, workers=8)
+    second = scan(catalog, runner=runner, env={}, workers=8)
+    serial = scan(catalog, runner=runner, env={}, workers=1)
+    assert list(first.entries) == list(catalog.providers)
+    assert list(second.entries) == list(first.entries)
+    assert list(serial.entries) == list(first.entries)
+
+
+def test_parallel_and_serial_agree_on_every_status():
+    catalog = _many_providers(9)
+
+    def runner(command, *, timeout):
+        return (1, "", "") if "mod4" in command else (0, "", "")
+
+    parallel = scan(catalog, runner=runner, env={}, workers=8)
+    serial = scan(catalog, runner=runner, env={}, workers=1)
+    assert {pid: e.status for pid, e in parallel.entries.items()} == {
+        pid: e.status for pid, e in serial.entries.items()
+    }
+    assert parallel.entries["p04"].status == "missing"
+
+
+def test_parallel_scan_is_faster_than_serial_when_detects_wait():
+    """Детекты ждут, а не считают: восемь потоков обязаны дать выигрыш."""
+    catalog = _many_providers(8)
+
+    def slow(command, *, timeout):
+        time.sleep(0.15)
+        return (0, "", "")
+
+    started = time.monotonic()
+    scan(catalog, runner=slow, env={}, workers=1)
+    serial = time.monotonic() - started
+
+    started = time.monotonic()
+    scan(catalog, runner=slow, env={}, workers=8)
+    parallel = time.monotonic() - started
+
+    assert parallel * 2 < serial, f"serial={serial:.2f}s parallel={parallel:.2f}s"
+
+
+def test_hosts_are_probed_once_each_even_in_parallel():
+    """Probe спящей машины дорогой — на хост он должен быть один."""
+    calls: list[str] = []
+    providers = {
+        f"p{index}": Provider(
+            id=f"p{index}",
+            capability="text",
+            kind="tool",
+            detect={"bin": "sh"},
+            io_in=("text",),
+            io_out="text",
+            notes="n",
+            source="s.json",
+            host="far",
+            run={"": "true > {out}"},
+        )
+        for index in range(5)
+    }
+    catalog = Catalog(
+        providers=providers,
+        hosts={
+            "far": Host(id="far", kind="ssh", addr="far", auto=False, probe="probe-far"),
+            "local": Host(id="local", kind="local"),
+        },
+        capabilities={"text": Capability(name="text", in_types=("text",), out="text")},
+        types={"text": ("txt",)},
+        bridges={},
+        recipes={},
+    )
+
+    def runner(command, *, timeout):
+        calls.append(command)
+        return (0, "", "")
+
+    scan(catalog, runner=runner, env={}, workers=8)
+    assert calls.count("probe-far") == 1, calls
+
+
+def test_one_broken_manifest_does_not_blind_the_whole_park(tmp_path, monkeypatch):
+    """NnError из подстановки переменных раньше обрывал скан целиком."""
+    monkeypatch.delenv("NN_NO_SUCH_VARIABLE", raising=False)
+    good = Provider(
+        id="good",
+        capability="text",
+        kind="tool",
+        detect={"bin": "sh"},
+        io_in=("text",),
+        io_out="text",
+        notes="n",
+        source="good.json",
+        host="local",
+        run={"": "true > {out}"},
+    )
+    broken = Provider(
+        id="broken",
+        capability="text",
+        kind="tool",
+        detect={"python": "anything"},
+        io_in=("text",),
+        io_out="text",
+        notes="n",
+        source="broken.json",
+        host="local",
+        run={"": "true > {out}"},
+        vars={"py": "$NN_NO_SUCH_VARIABLE/bin/python3"},
+    )
+    catalog = Catalog(
+        providers={"good": good, "broken": broken},
+        hosts={"local": Host(id="local", kind="local")},
+        capabilities={"text": Capability(name="text", in_types=("text",), out="text")},
+        types={"text": ("txt",)},
+        bridges={},
+        recipes={},
+    )
+
+    registry = scan(catalog, runner=lambda command, *, timeout: (0, "", ""), env={}, workers=8)
+    assert registry.entries["good"].status == "ok"
+    assert registry.entries["broken"].status == "missing"
+    assert registry.entries["broken"].reason
