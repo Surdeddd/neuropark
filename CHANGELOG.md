@@ -21,6 +21,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · versioning: 
 - **An unreachable host was reported as a missing binary.** ssh failing to connect says
   nothing about the tool, so the status is `stale` with the real ssh error. `nn doctor` no
   longer asks "is the tool installed?" when the truth is that no host answered.
+- **One broken manifest blinded the whole park.** An `NnError` from variable expansion (a
+  `vars.py` pointing at an unset env variable, say) aborted the entire scan, leaving no
+  registry at all. That provider is now `missing` with the error as its reason, and the rest
+  of the park scans normally.
 
 ### Added
 
@@ -35,13 +39,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · versioning: 
   each, an unreachable host burns its whole connect timeout. Measured on a park with three
   dead hosts and four slow detects: 10.6s serial → 3.6s. Registry order still follows the
   catalog, not whoever answered first, so park drift stays meaningful.
-
-### Fixed (continued)
-
-- **One broken manifest blinded the whole park.** An `NnError` from variable expansion (a
-  `vars.py` pointing at an unset env variable, say) aborted the entire scan, leaving no
-  registry at all. That provider is now `missing` with the error as its reason, and the rest
-  of the park scans normally.
 
 ## 0.8.0 — 2026-08-12
 

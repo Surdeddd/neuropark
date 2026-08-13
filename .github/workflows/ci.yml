@@ -163,6 +163,16 @@ jobs:
           export NN_SSH_SMOKE_OPTS="-p 2222 -i $dir/clientkey -o IdentitiesOnly=yes -o UserKnownHostsFile=$dir/known_hosts"
           pytest tests/test_smoke_ssh.py -v
 
-      # A skipped smoke must look skipped, never green-by-accident.
+      # A skipped smoke must look skipped, never green-by-accident. The count is
+      # deliberately not hardcoded: the first version asserted "6 skipped" and broke
+      # the moment the suite grew, which says nothing about the product.
       - name: Without a host the smokes skip, not pass
-        run: pytest tests/test_smoke_ssh.py -q -rs | tee /dev/stderr | grep -q "6 skipped"
+        run: |
+          set -uo pipefail
+          out="$(pytest tests/test_smoke_ssh.py -q -rs)"
+          printf '%s\n' "$out"
+          printf '%s\n' "$out" | grep -Eq '[0-9]+ skipped' || {
+            echo "expected the smokes to skip without NN_SSH_SMOKE_HOST"; exit 1; }
+          if printf '%s\n' "$out" | grep -Eq '[0-9]+ (passed|failed)'; then
+            echo "nothing may run without a host"; exit 1
+          fi
