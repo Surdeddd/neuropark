@@ -260,3 +260,29 @@ def test_unknown_template_variable_is_reported(monkeypatch, tmp_path):
         )
     assert err.value.code == Exit.BAD_DATA
     assert "mystery" in err.value.message
+
+
+def test_run_ids_differ_within_one_second():
+    """Два прогона в одну секунду получали один run_id и затирали друг друга.
+
+    Проверено живьём: два параллельных whisper вернули один и тот же `out`.
+    """
+    from datetime import UTC, datetime
+
+    from nn.run import new_run_id
+
+    moment = datetime(2026, 8, 13, 12, 0, 0, tzinfo=UTC)
+    ids = {new_run_id("whisper-cpp", moment) for _ in range(1000)}
+    assert len(ids) == 1000, "внутри процесса уникальность обязана быть гарантированной"
+    assert all(one.startswith(f"{int(moment.timestamp())}-") for one in ids)
+    assert all(one.endswith("-whisper-cpp") for one in ids)
+
+
+def test_run_id_keeps_the_second_first_so_files_sort_by_time():
+    from datetime import UTC, datetime
+
+    from nn.run import new_run_id
+
+    early = new_run_id("p", datetime(2026, 8, 13, 12, 0, 0, tzinfo=UTC))
+    later = new_run_id("p", datetime(2026, 8, 13, 12, 0, 1, tzinfo=UTC))
+    assert sorted([later, early]) == [early, later]

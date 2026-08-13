@@ -13,7 +13,7 @@ from nn.model import Role
 from nn.paths import state_dir
 from nn.registry import Registry
 from nn.resolve import Choice, resolve_role
-from nn.run import Envelope, execute
+from nn.run import Envelope, execute, new_run_id
 from nn.worktree import create, finish
 
 STAGE_ROLES = {
@@ -115,7 +115,9 @@ def _work_stage(
     now: datetime,
 ) -> StageResult:
     choice = resolve_role(role_name, catalog=catalog, registry=registry, exhausted=exhausted)
-    run_id = f"{int(now.timestamp())}-orch{run_index}-{choice.provider.id}"
+    # run_index различает ветки одного веера, но не две оркестрации в одну секунду:
+    # у них совпали бы и worktree, и патч. Метка берётся оттуда же, откуда у прогонов.
+    run_id = new_run_id(f"orch{run_index}-{choice.provider.id}", now)
     if not role.worktree:
         envelope = execute(choice, catalog=catalog, prompt=prompt, work_dir=str(repo), now=now)
         return StageResult(

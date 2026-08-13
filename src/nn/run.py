@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import itertools
 import json
+import secrets
 import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -17,6 +19,9 @@ from nn.render import build_context, pick, render
 from nn.resolve import Choice
 from nn.runlog import RunRecord, append
 from nn.transport import Executed, LocalTransport, get_transport, resolve_env
+
+# Метка этого процесса: между процессами run_id расходятся именно по ней.
+_TOKEN = secrets.token_hex(3)
 
 NO_RETRY = {"quota", "refused", "empty"}
 STDERR_TAIL_CHARS = 800
@@ -58,6 +63,25 @@ def _out_dir() -> Path:
     return path
 
 
+_SEQUENCE = itertools.count()
+
+
+def new_run_id(provider_id: str, moment: datetime) -> str:
+    """Идентификатор прогона: секунда, метка процесса, счётчик и провайдер.
+
+    Секунды не хватает: два `nn run` одного провайдера в одну секунду получали
+    одинаковый run_id, а с ним один выходной файл, один лог и один временный
+    префикс — и затирали друг друга. Проверено двумя параллельными прогонами
+    whisper: оба вернули один и тот же `out`.
+
+    Случайности тоже мало. На двух байтах двести идентификаторов сталкиваются
+    примерно в четверти случаев (парадокс дней рождения) — это поймал тест.
+    Поэтому внутри процесса уникальность даёт счётчик, а между процессами —
+    случайная метка.
+    """
+    return f"{int(moment.timestamp())}-{_TOKEN}{next(_SEQUENCE):x}-{provider_id}"
+
+
 def _default_out(
     run_id: str,
     out_type: str,
@@ -92,10 +116,13 @@ def execute(
         )
 
     moment = now or datetime.now(UTC)
-    run_id = f"{int(moment.timestamp())}-{provider.id}"
+    run_id = new_run_id(provider.id, moment)
     work = work_dir or str(Path.cwd())
     out_type = choice.out_type or provider.io_out
     final_out = out_path or _default_out(run_id, out_type, dict(catalog.types), provider.out_ext)
+    # Папку под явный --out делаем сами: иначе инструмент молча не мог записать файл,
+    # и исход классифицировался как «пустой ответ» — про модель, хотя виновата папка.
+    Path(final_out).parent.mkdir(parents=True, exist_ok=True)
     log_file = _out_dir() / f"{run_id}.log"
     transport = get_transport(choice.host)
     env_vars = resolve_env(choice.host, {})

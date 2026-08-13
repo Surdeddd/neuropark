@@ -234,3 +234,16 @@ def test_doctor_on_clean_catalog_says_no_problems(env, capsys):
     capsys.readouterr()
     assert main(["doctor"]) == int(Exit.OK)
     assert capsys.readouterr().out.strip()
+
+
+def test_out_into_a_missing_directory_is_created(env, capsys):
+    """Раньше инструмент не мог записать файл, и исход врал «пустой ответ»."""
+    main(["scan"])
+    source = env / "a.wav"
+    source.write_bytes(b"\x00")
+    target = env / "no" / "such" / "dir" / "out.srt"
+    capsys.readouterr()
+    assert main(["run", "transcribe", str(source), "-o", str(target)]) == int(Exit.OK)
+    envelope = json.loads(capsys.readouterr().out)
+    assert envelope["outcome"] == "success", envelope
+    assert target.is_file()

@@ -11,6 +11,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · versioning: 
 
 ### Fixed
 
+- **Two runs in the same second shared one identity.** `run_id` was second-plus-provider,
+  so two `nn run` of the same provider started within one second got the same output file,
+  the same log and the same temp prefix, and clobbered each other — confirmed by two
+  parallel whisper runs returning the identical `out`. Uniqueness inside a process now
+  comes from a counter and between processes from a random token; a first attempt with two
+  random bytes collided on 200 ids, which the test caught (birthday paradox). Orchestration
+  ids had the same flaw and the same fix, where a collision meant a shared worktree.
+- **`--out` into a directory that does not exist** produced outcome `empty` — a verdict
+  about the model, when the truth was that nothing could be written. The parent directory
+  is created, as it already was for default outputs.
 - **A file name with a space broke the run.** Commands are assembled as shell strings, so
   `nn run transcribe "my clip.wav"` split into two arguments and died with exit 254 —
   and a name with a quote in it could have run whatever came after. Every path nn
