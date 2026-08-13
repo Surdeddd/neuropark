@@ -17,6 +17,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · versioning: 
   substitutes itself (`{in}` `{out}` `{out_base}` `{tmp}` `{dir}` `{prompt_file}`
   `{extraN}`) is now shell-escaped; `vars` and `host.paths.*` stay raw, because those
   are the manifest author's and may legitimately hold a set of flags.
+- The same class in local detection: the interpreter pinned in `vars.py` and the `http`
+  endpoint went into the shell unquoted, so a venv under «My Tools» or a URL with an
+  ampersand broke the check — the ampersand would have pushed curl into the background
+  and the answer would have been meaningless rather than wrong-but-honest.
 - **ssh does not preserve argument boundaries** — it joins argv with spaces and hands the
   result to the remote login shell. So a remote path with a space was re-split over there:
   `cat -- '/tmp/…/итог (копия).txt'` failed on globbing, and worse, cleanup of

@@ -77,7 +77,7 @@ def test_python_module_checked_with_pinned_interpreter():
         return (0, "", "")
 
     run_detect({"python": "mlx_audio"}, runner=runner, interpreter="/venv/bin/python3")
-    assert seen == ['/venv/bin/python3 -c "import mlx_audio"']
+    assert seen == ["/venv/bin/python3 -c 'import mlx_audio'"]
 
 
 def test_python_module_falls_back_to_system_interpreter():
@@ -88,7 +88,7 @@ def test_python_module_falls_back_to_system_interpreter():
         return (0, "", "")
 
     run_detect({"python": "json"}, runner=runner)
-    assert seen == ['python3 -c "import json"']
+    assert seen == ["python3 -c 'import json'"]
 
 
 def test_npm_docker_brew_strategies():
@@ -125,3 +125,28 @@ def test_which_finds_known_locations(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("PATH", "/nonexistent")
     assert which("toolz") == str(fake_bin)
+
+
+def test_interpreter_with_a_space_survives():
+    """Венв в «~/My Tools/venv» — обычное дело, а команда собирается строкой."""
+    seen: list[str] = []
+
+    def runner(command, *, timeout):
+        seen.append(command)
+        return (0, "", "")
+
+    run_detect({"python": "mlx_audio"}, runner=runner, interpreter="/My Tools/venv/bin/python3")
+    assert seen == ["'/My Tools/venv/bin/python3' -c 'import mlx_audio'"]
+
+
+def test_http_endpoint_is_quoted():
+    seen: list[str] = []
+
+    def runner(command, *, timeout):
+        seen.append(command)
+        return (0, "", "")
+
+    # Амперсанд в незакавыченном URL увёл бы curl в фон, а проверку — в никуда.
+    url = "http://127.0.0.1:8188/system_stats?x=1&y=2"
+    run_detect({"http": url}, runner=runner)
+    assert seen[0].endswith(f"'{url}'")

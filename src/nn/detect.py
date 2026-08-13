@@ -317,7 +317,7 @@ def run_detect(
 
     url = spec.get("http")
     if url:
-        code, _, _ = runner(f"curl -fsS -m 3 -o /dev/null {url}", timeout=5)
+        code, _, _ = runner(f"curl -fsS -m 3 -o /dev/null {shlex.quote(str(url))}", timeout=5)
         if code != 0:
             return DetectResult(
                 "missing", bi(f"endpoint {url} did not answer", f"эндпоинт {url} не ответил")
@@ -325,8 +325,10 @@ def run_detect(
 
     module = spec.get("python")
     if module:
-        python = interpreter or "python3"
-        code, _, _ = runner(f'{python} -c "import {module}"', timeout=15)
+        # Путь до венва пользователя вполне может содержать пробел — без кавычек
+        # проверка ломалась ровно так же, как ломался прогон с «my clip.wav».
+        python = shlex.quote(interpreter or "python3")
+        code, _, _ = runner(f"{python} -c {shlex.quote(f'import {module}')}", timeout=15)
         if code != 0:
             return DetectResult(
                 "missing",
