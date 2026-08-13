@@ -293,10 +293,11 @@ def test_get_transport_returns_ssh_for_an_auto_ssh_host():
     assert not isinstance(get_transport(manual), Exported)
 
 
-def test_unreachable_host_becomes_a_recorded_run(tmp_path, monkeypatch):
-    """Мёртвый хост — исход в журнале, а не исключение наружу: досье учатся на нём.
+def test_unreachable_host_at_scan_time_is_stale_not_missing(tmp_path, monkeypatch):
+    """Хост не ответил — статус stale и честная причина, а не «бинаря нет».
 
     Настоящий ssh на порт 1: соединение отвергается мгновенно, сети не нужно.
+    Про инструмент мы в этом случае не узнали ничего, и говорить «его нет» — врать.
     """
     import json
 
@@ -347,16 +348,95 @@ def test_unreachable_host_becomes_a_recorded_run(tmp_path, monkeypatch):
     monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
 
     assert main(["scan"]) == int(Exit.OK)
+    registry = json.loads(
+        next((tmp_path / "state").glob("registry.*.json")).read_text(encoding="utf-8")
+    )
+    entry = registry["entries"]["remote-text"]
+    assert entry["status"] == "stale", entry
+    assert "не ответил" in entry["reason"] or "did not answer" in entry["reason"], entry
+    assert "sh" not in entry["reason"].split(), "про бинарь мы ничего не узнали"
+
+    # Резолвер такого провайдера не берёт: он отказывается ДО запуска.
+    assert main(["run", "text", "--prompt", "hi", "--provider", "remote-text"]) == int(
+        Exit.NO_PROVIDER
+    )
+    assert not (tmp_path / "state" / "runs.jsonl").exists(), "ничего не запускалось — журнал пуст"
+
+
+def test_host_that_dies_after_the_scan_becomes_a_recorded_run(tmp_path, monkeypatch):
+    """Хост был жив на скане и умер к запуску — это исход в журнале, а не исключение.
+
+    Именно так досье учатся на «connection refused»: реестр говорит ok, а прогон
+    падает на подготовке.
+    """
+    import json as jsonlib
+
+    from nn.cli import main
+    from nn.errors import Exit
+    from nn.registry import Entry, Registry, hostname, save
+
+    data = tmp_path / "data"
+    (data / "providers").mkdir(parents=True)
+    (data / "hosts").mkdir(parents=True)
+    (data / "providers" / "remote-text.json").write_text(
+        jsonlib.dumps(
+            {
+                "id": "remote-text",
+                "capability": "text",
+                "kind": "agent",
+                "host": "deadbox",
+                "detect": {"bin": "sh"},
+                "io": {"in": ["text"], "out": "text"},
+                "run": "cat {prompt_file} > {out}",
+                "notes": {"en": "remote", "ru": "удалённый"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (data / "hosts" / "deadbox.json").write_text(
+        jsonlib.dumps(
+            {
+                "id": "deadbox",
+                "kind": "ssh",
+                "addr": "127.0.0.1",
+                "auto": True,
+                "paths": {"tmp": "/tmp"},
+                "ssh_options": ["-p", "1"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (data / "hosts" / "local.json").write_text(
+        jsonlib.dumps({"id": "local", "kind": "local"}), encoding="utf-8"
+    )
+    (data / "capabilities.json").write_text(
+        jsonlib.dumps(
+            {"types": {"text": ["txt"]}, "capabilities": {"text": {"in": ["text"], "out": "text"}}}
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("NN_DATA", str(data))
+    monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
+
+    # Реестр от того момента, когда хост ещё отвечал.
+    save(
+        Registry(
+            hostname=hostname(),
+            generated_at="2026-08-13T00:00:00+00:00",
+            entries={"remote-text": Entry("remote-text", "deadbox", "ok", "", None, "2026-08-13")},
+        )
+    )
+
     assert main(["run", "text", "--prompt", "hi", "--provider", "remote-text"]) == int(
         Exit.PROVIDER_FAILED
     )
     runs = (tmp_path / "state" / "runs.jsonl").read_text(encoding="utf-8").strip().splitlines()
-    assert runs, "прогон обязан попасть в журнал, даже если хост недоступен"
-    record = json.loads(runs[-1])
+    assert runs, "прогон обязан попасть в журнал"
+    record = jsonlib.loads(runs[-1])
     assert record["provider"] == "remote-text"
     assert record["host"] == "deadbox"
     assert record["outcome"] == "crash"
-    assert "refused" in record["stderr_tail"].lower() or record["stderr_tail"]
+    assert record["stderr_tail"]
 
 
 def test_host_ssh_options_reach_the_command_line():
@@ -437,8 +517,18 @@ def test_failed_preparation_still_cleans_up_the_remote_directory(tmp_path, monke
             return Executed(1, "", "ssh: broken pipe", False, " ".join(argv))
 
     monkeypatch.setattr("nn.transport.SshTransport", HalfBroken)
+    # Детект теперь идёт на ту сторону, поэтому реестр пишем как от живого хоста:
+    # проверяем именно уборку после провала заливки, а не поведение скана.
+    from nn.registry import Entry, Registry, hostname, save
 
-    assert main(["scan"]) == int(Exit.OK)
+    save(
+        Registry(
+            hostname=hostname(),
+            generated_at="2026-08-13T00:00:00+00:00",
+            entries={"remote-text": Entry("remote-text", "halfbox", "ok", "", None, "2026-08-13")},
+        )
+    )
+
     assert main(["run", "text", "--prompt", "hi", "--provider", "remote-text"]) == int(
         Exit.PROVIDER_FAILED
     )

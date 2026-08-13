@@ -94,6 +94,68 @@ def _check_roles(catalog: Catalog, registry: Registry) -> list[Finding]:
     return findings
 
 
+def _why_empty(capability: str, ids: list[str], registry: Registry) -> str:
+    """Причина пустой capability по фактическим статусам, а не наугад.
+
+    Раньше здесь всегда спрашивалось «инструмент вообще установлен?» — даже когда
+    провайдер жив, а до его машины просто не дошёл ssh.
+    """
+    statuses = {entry.status for pid in ids if (entry := registry.get(pid)) is not None}
+    if statuses == {"stale"}:
+        return bi(
+            f"capability {capability}: every provider is on a host that did not answer",
+            f"capability {capability}: все провайдеры на хостах, которые не ответили",
+        )
+    if statuses == {"needs-key"}:
+        return bi(
+            f"capability {capability}: every provider is waiting for a key",
+            f"capability {capability}: все провайдеры ждут ключа",
+        )
+    return bi(
+        f"capability {capability}: no provider available — is the tool installed?",
+        f"capability {capability}: ни одного доступного провайдера — инструмент вообще установлен?",
+    )
+
+
+def _check_remote_hosts(catalog: Catalog) -> list[Finding]:
+    """Хост, на котором nn запускает сам, но не здесь: две частые недонастройки.
+
+    PATH — самая частая причина удалённого провала: у неинтерактивного ssh-шелла он
+    урезан, и установленный инструмент отвечает «command not found». Проверка стоит
+    ноль, а экономит прогон.
+    """
+    findings: list[Finding] = []
+    used = {provider.host for provider in catalog.providers.values()}
+    for host in sorted(catalog.hosts.values(), key=lambda h: h.id):
+        if host.kind != "ssh" or not host.auto or host.id not in used:
+            continue
+        if not host.env.get("PATH"):
+            findings.append(
+                Finding(
+                    "warn",
+                    host.id,
+                    bi(
+                        "kind=ssh with auto=true and no PATH in env: a non-interactive ssh"
+                        " shell does not see /opt/homebrew/bin or /usr/local/bin",
+                        "kind=ssh с auto=true и без PATH в env: неинтерактивный ssh-шелл"
+                        " не видит ни /opt/homebrew/bin, ни /usr/local/bin",
+                    ),
+                )
+            )
+        if not host.probe:
+            findings.append(
+                Finding(
+                    "warn",
+                    host.id,
+                    bi(
+                        "no probe: a sleeping host will be found out one command later",
+                        "нет probe: спящий хост обнаружится только на команде",
+                    ),
+                )
+            )
+    return findings
+
+
 def check(
     catalog: Catalog,
     registry: Registry | None,
@@ -221,19 +283,10 @@ def check(
             # Предупреждение, а не ошибка: на машине, где инструмент просто не поставлен,
             # каталог цел. Раньше это был error, и doctor на свежей машине отдавал 7 —
             # выглядело как «nn сломан», хотя парк всего лишь пуст.
-            findings.append(
-                Finding(
-                    "warn",
-                    capability,
-                    bi(
-                        f"capability {capability}: no provider available — is the tool installed?",
-                        f"capability {capability}: ни одного доступного провайдера —"
-                        " инструмент вообще установлен?",
-                    ),
-                )
-            )
+            findings.append(Finding("warn", capability, _why_empty(capability, ids, registry)))
 
     findings.extend(_check_roles(catalog, registry))
+    findings.extend(_check_remote_hosts(catalog))
 
     for recipe in sorted(catalog.recipes.values(), key=lambda r: r.id):
         for index, step in enumerate(recipe.steps):

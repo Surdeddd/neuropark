@@ -7,6 +7,30 @@ speaks both English and Russian.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · versioning: [SemVer](https://semver.org/).
 
+## 0.9.0 — 2026-08-13
+
+### Fixed
+
+- **A provider on a remote host was detected on the wrong machine.** Detection always ran
+  locally, so `nn ls` answered about *this* computer: a binary in your own `PATH` made a
+  provider on `gpu-box` look available, and its absence here marked a perfectly installed
+  remote tool as missing. For an `ssh` host with `auto: true` every strategy now runs on
+  that machine — `~` is its home, globs expand in its shell, `env` and `requires_key` are
+  checked against the host's env, which is what the run will actually see. `version_cmd`
+  goes there too.
+- **An unreachable host was reported as a missing binary.** ssh failing to connect says
+  nothing about the tool, so the status is `stale` with the real ssh error. `nn doctor` no
+  longer asks "is the tool installed?" when the truth is that no host answered.
+
+### Added
+
+- Detection over ssh runs as **one connection per provider** instead of one per strategy:
+  every check goes in a single script whose exit code names the first failure. On the loop
+  it cut a four-strategy detect from 0.25s to 0.07s; over a real network the saving scales
+  with the number of strategies.
+- `nn doctor` warns about an `ssh` host that has no `PATH` in `env` (the top cause of a
+  remote `command not found`) and about one with no `probe`.
+
 ## 0.8.0 — 2026-08-12
 
 ### Added

@@ -13,6 +13,7 @@ authorized_keys во временной директории, конфиг по�
 import json
 import os
 import shlex
+import shutil
 import subprocess
 
 import pytest
@@ -34,7 +35,14 @@ CAPS = {"types": {"text": ["txt"]}, "capabilities": {"text": {"in": ["text"], "o
 
 
 def host() -> Host:
-    return Host(id="smoke", kind="ssh", addr=HOST_ADDR, auto=True, paths={"tmp": "/tmp"})
+    return Host(
+        id="smoke",
+        kind="ssh",
+        addr=HOST_ADDR,
+        auto=True,
+        paths={"tmp": "/tmp"},
+        ssh_options=OPTS,
+    )
 
 
 def transport() -> SshTransport:
@@ -217,3 +225,158 @@ def test_full_cli_run_lands_the_output_and_leaves_nothing_behind(tmp_path, monke
 
     listing = remote("ls", "-1", "/tmp").stdout.splitlines()
     assert [name for name in listing if name.startswith("nn-") and "remote-echo" in name] == []
+
+
+def test_detection_happens_on_the_far_side_with_the_host_env(tmp_path, monkeypatch):
+    """Инструмент виден только удалённому шеллу — значит детект прошёл именно там.
+
+    Бинарь лежит в каталоге, которого нет ни в моём PATH, ни в списке мест, куда
+    смотрит локальный детект. Удалённая сторона находит его только потому, что
+    каталог прописан в env хоста. Раньше детект всегда шёл локально и такой
+    провайдер считался отсутствующим.
+    """
+    far = tmp_path / "far-bin"
+    far.mkdir()
+    tool = far / "nn-far-tool"
+    tool.write_text("#!/bin/sh\nprintf far\n", encoding="utf-8")
+    tool.chmod(0o755)
+    assert shutil.which("nn-far-tool") is None, "локально его быть не должно"
+
+    data = tmp_path / "data"
+    (data / "providers").mkdir(parents=True)
+    (data / "hosts").mkdir(parents=True)
+    (data / "providers" / "far-tool.json").write_text(
+        json.dumps(
+            {
+                "id": "far-tool",
+                "capability": "text",
+                "kind": "tool",
+                "host": "smokebox",
+                "detect": {"bin": "nn-far-tool"},
+                "io": {"in": ["text"], "out": "text"},
+                "run": "nn-far-tool > {out}",
+                "notes": {"en": "only on the far side", "ru": "только на той стороне"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (data / "hosts" / "smokebox.json").write_text(
+        json.dumps(
+            {
+                "id": "smokebox",
+                "kind": "ssh",
+                "addr": HOST_ADDR,
+                "auto": True,
+                "paths": {"tmp": "/tmp"},
+                "ssh_options": list(OPTS),
+                "env": {"PATH": f"{far}:/usr/bin:/bin"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (data / "hosts" / "local.json").write_text(
+        json.dumps({"id": "local", "kind": "local"}), encoding="utf-8"
+    )
+    (data / "capabilities.json").write_text(json.dumps(CAPS), encoding="utf-8")
+    monkeypatch.setenv("NN_DATA", str(data))
+    monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
+
+    assert main(["scan"]) == int(Exit.OK)
+    registry = json.loads(
+        next((tmp_path / "state").glob("registry.*.json")).read_text(encoding="utf-8")
+    )
+    assert registry["entries"]["far-tool"]["status"] == "ok", registry["entries"]["far-tool"]
+
+
+def test_a_tool_absent_on_the_far_side_is_not_saved_by_local_presence(tmp_path, monkeypatch):
+    """Обратная сторона: локально инструмент есть, а на удалённом PATH его нет."""
+    data = tmp_path / "data"
+    (data / "providers").mkdir(parents=True)
+    (data / "hosts").mkdir(parents=True)
+    (data / "providers" / "local-only.json").write_text(
+        json.dumps(
+            {
+                "id": "local-only",
+                "capability": "text",
+                "kind": "tool",
+                "host": "smokebox",
+                "detect": {"bin": "uv"},
+                "io": {"in": ["text"], "out": "text"},
+                "run": "uv --version > {out}",
+                "notes": {"en": "here but maybe not there", "ru": "здесь есть, там может и нет"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (data / "hosts" / "smokebox.json").write_text(
+        json.dumps(
+            {
+                "id": "smokebox",
+                "kind": "ssh",
+                "addr": HOST_ADDR,
+                "auto": True,
+                "paths": {"tmp": "/tmp"},
+                "ssh_options": list(OPTS),
+                "env": {"PATH": "/usr/bin:/bin"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (data / "hosts" / "local.json").write_text(
+        json.dumps({"id": "local", "kind": "local"}), encoding="utf-8"
+    )
+    (data / "capabilities.json").write_text(json.dumps(CAPS), encoding="utf-8")
+    monkeypatch.setenv("NN_DATA", str(data))
+    monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
+
+    assert shutil.which("uv") is not None, "тест держится на том, что uv есть локально"
+    assert main(["scan"]) == int(Exit.OK)
+    registry = json.loads(
+        next((tmp_path / "state").glob("registry.*.json")).read_text(encoding="utf-8")
+    )
+    entry = registry["entries"]["local-only"]
+    assert entry["status"] == "missing", entry
+
+
+def test_batched_detect_names_the_real_reason_over_live_ssh():
+    """Все проверки одним коннектом, и причина указывает на ту, что действительно упала."""
+    from nn.detect import detect_over_runner
+    from nn.transport.ssh import runner_for
+
+    probe = runner_for(host(), {"PATH": "/usr/bin:/bin"})
+
+    ok = detect_over_runner({"bin": "sh", "files": ["/etc/hosts"]}, env={}, runner=probe)
+    assert ok.status == "ok", ok
+
+    # Первая проверка проходит, вторая — нет: причина обязана быть про файл.
+    partial = detect_over_runner(
+        {"bin": "sh", "files": ["/definitely/not/here"]}, env={}, runner=probe
+    )
+    assert partial.status == "missing", partial
+    assert "not/here" in partial.reason, partial.reason
+
+    # Обратный порядок: падает первая.
+    first = detect_over_runner(
+        {"bin": "definitely-not-installed-xyz", "files": ["/etc/hosts"]}, env={}, runner=probe
+    )
+    assert first.status == "missing", first
+    assert "definitely-not-installed-xyz" in first.reason, first.reason
+
+
+def test_home_is_the_remote_home_not_ours():
+    """`~/x` раскрывает шелл той стороны: домашняя директория там своя."""
+    from nn.detect import detect_over_runner
+    from nn.transport.ssh import runner_for
+
+    probe = runner_for(host(), {})
+    marker = ".nn-home-probe"
+    # ssh склеивает argv пробелами, поэтому команда идёт одной строкой: иначе
+    # `sh -c` заберёт только первое слово, а остальное станет $0.
+    assert remote(f'touch "$HOME/{marker}"').returncode == 0
+    try:
+        found = detect_over_runner({"files": [f"~/{marker}"]}, env={}, runner=probe)
+        assert found.status == "ok", found
+        absent = detect_over_runner({"files": ["~/.nn-no-such-marker"]}, env={}, runner=probe)
+        assert absent.status == "missing", absent
+    finally:
+        remote(f'rm -f "$HOME/{marker}"')

@@ -35,7 +35,7 @@ from nn.run import execute, exit_code_for
 from nn.runlog import last_success_map, read_all
 from nn.scan import scan
 
-VERSION = "0.8.0"
+VERSION = "0.9.0"
 
 
 def build_parser() -> argparse.ArgumentParser:

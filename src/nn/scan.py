@@ -5,17 +5,27 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 
 from nn.catalog import Catalog
-from nn.detect import Runner, run_detect, shell_runner
+from nn.detect import Runner, detect_over_runner, run_detect, shell_runner
 from nn.i18n import bi
 from nn.model import Host, Provider
 from nn.paths import expand
 from nn.registry import Entry, Registry, hostname
+from nn.transport.ssh import runner_for
 
 
 def _interpreter_of(provider: Provider) -> str | None:
     """Питон провайдера, если манифест закрепил свой в vars.py."""
     raw = provider.vars.get("py")
     return expand(raw) if raw else None
+
+
+def _runs_elsewhere(host: Host) -> bool:
+    """Хост, на котором nn действительно запускает команды сам, но не здесь.
+
+    `auto: false` не считается: там команда только печатается, а проверять её
+    исполнимость всё равно нечем — детект остаётся локальным, как и раньше.
+    """
+    return host.kind == "ssh" and host.auto
 
 
 def _host_reachable(host: Host, runner: Runner) -> bool:
@@ -68,18 +78,32 @@ def scan(
             )
             continue
 
-        merged_env = dict(env if env is not None else os.environ)
-        merged_env.update(host.env)
-        result = run_detect(
-            provider.detect,
-            requires_key=provider.requires_key,
-            env=merged_env,
-            runner=runner,
-            interpreter=_interpreter_of(provider),
-        )
+        # Провайдер проверяется там, где он будет работать. Раньше детект всегда
+        # шёл локально, и `nn ls` отвечал про эту машину вместо удалённой: бинарь
+        # есть у меня — значит «ok», хотя запускать его собирались на gpu-box.
+        if _runs_elsewhere(host):
+            probe = runner_for(host, host.env)
+            result = detect_over_runner(
+                provider.detect,
+                requires_key=provider.requires_key,
+                env=host.env,
+                runner=probe,
+                interpreter=_interpreter_of(provider),
+            )
+        else:
+            merged_env = dict(env if env is not None else os.environ)
+            merged_env.update(host.env)
+            probe = runner
+            result = run_detect(
+                provider.detect,
+                requires_key=provider.requires_key,
+                env=merged_env,
+                runner=runner,
+                interpreter=_interpreter_of(provider),
+            )
         version: str | None = None
         if result.status == "ok" and provider.version_cmd:
-            code, out, _ = runner(provider.version_cmd, timeout=20)
+            code, out, _ = probe(provider.version_cmd, timeout=20)
             if code == 0 and out.strip():
                 version = out.strip().splitlines()[0][:60]
         entries[provider.id] = Entry(

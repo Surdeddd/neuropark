@@ -11,6 +11,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from nn.detect import Runner
 from nn.errors import Exit, NnError
 from nn.gitenv import clean_env
 from nn.i18n import bi
@@ -63,6 +64,46 @@ def build_script(command: str, *, remote_dir: str, env: Mapping[str, str]) -> st
     lines.extend(f"export {key}={shlex.quote(value)}" for key, value in sorted(env.items()))
     lines.append(command)
     return "\n".join(lines) + "\n"
+
+
+def runner_for(host: Host, env: Mapping[str, str] | None = None) -> Runner:
+    """Runner, исполняющий команды на удалённой машине — для детекта и версий.
+
+    Тот же интерфейс, что у локального `shell_runner`, поэтому детект переезжает
+    на чужую машину без второй реализации. Окружение уходит через stdin вместе с
+    командой: ключи не светятся в `ps` на той стороне.
+    """
+    options = [
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        f"ConnectTimeout={CONNECT_TIMEOUT_S}",
+        *host.ssh_options,
+    ]
+    addr = host.addr or host.id
+    exports = "\n".join(
+        f"export {key}={shlex.quote(value)}" for key, value in sorted((env or {}).items())
+    )
+
+    def run(command: str, *, timeout: float) -> tuple[int, str, str]:
+        script = f"{exports}\n{command}\n" if exports else f"{command}\n"
+        try:
+            done = subprocess.run(
+                ["ssh", *options, addr, "sh", "-s"],
+                input=script,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+                env=clean_env(),
+            )
+        except subprocess.TimeoutExpired:
+            return (124, "", "timeout")
+        except OSError as exc:
+            return (127, "", str(exc))
+        return (done.returncode, done.stdout, done.stderr)
+
+    return run
 
 
 @dataclass

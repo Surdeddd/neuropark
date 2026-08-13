@@ -160,3 +160,170 @@ def test_empty_park_is_a_warning_not_an_error(tmp_path, monkeypatch):
     absent = [f for f in findings if "provider available" in f.message or "доступного" in f.message]
     assert absent
     assert all(f.severity == "warn" for f in absent), [f for f in absent if f.severity != "warn"]
+
+
+def test_remote_host_without_path_gets_a_warning(tmp_path, monkeypatch):
+    """PATH у неинтерактивного ssh-шелла урезан — это стоит сказать до прогона."""
+    monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
+    host = Host(id="gpu", kind="ssh", addr="gpu", auto=True, probe="true")
+    provider = Provider(
+        id="far",
+        capability="text",
+        kind="tool",
+        detect={"bin": "x"},
+        io_in=("text",),
+        io_out="text",
+        notes="n",
+        source="far.json",
+        host="gpu",
+        run={"": "x > {out}"},
+    )
+    catalog = Catalog(
+        providers={"far": provider},
+        hosts={"gpu": host, "local": Host(id="local", kind="local")},
+        capabilities={"text": Capability(name="text", in_types=("text",), out="text")},
+        types={"text": ("txt",)},
+        bridges={},
+        recipes={},
+    )
+    registry = Registry(
+        hostname="h",
+        generated_at="2026-08-13T00:00:00+00:00",
+        entries={"far": Entry("far", "gpu", "ok", "", None, "2026-08-13")},
+    )
+    findings = check(catalog, registry, runs=[])
+    about_path = [f for f in findings if f.subject == "gpu" and "PATH" in f.message]
+    assert about_path, findings
+    assert about_path[0].severity == "warn"
+
+
+def test_remote_host_with_path_and_probe_is_quiet(tmp_path, monkeypatch):
+    monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
+    host = Host(
+        id="gpu",
+        kind="ssh",
+        addr="gpu",
+        auto=True,
+        probe="ssh gpu true",
+        env={"PATH": "/usr/bin:/bin"},
+    )
+    provider = Provider(
+        id="far",
+        capability="text",
+        kind="tool",
+        detect={"bin": "x"},
+        io_in=("text",),
+        io_out="text",
+        notes="n",
+        source="far.json",
+        host="gpu",
+        run={"": "x > {out}"},
+    )
+    catalog = Catalog(
+        providers={"far": provider},
+        hosts={"gpu": host, "local": Host(id="local", kind="local")},
+        capabilities={"text": Capability(name="text", in_types=("text",), out="text")},
+        types={"text": ("txt",)},
+        bridges={},
+        recipes={},
+    )
+    registry = Registry(
+        hostname="h",
+        generated_at="2026-08-13T00:00:00+00:00",
+        entries={"far": Entry("far", "gpu", "ok", "", None, "2026-08-13")},
+    )
+    assert [f for f in check(catalog, registry, runs=[]) if f.subject == "gpu"] == []
+
+
+def test_manual_host_is_not_nagged_about_path(tmp_path, monkeypatch):
+    """У auto=false команда только печатается — PATH там не наша забота."""
+    monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
+    host = Host(id="gpu", kind="ssh", addr="gpu", auto=False)
+    provider = Provider(
+        id="far",
+        capability="text",
+        kind="tool",
+        detect={"bin": "x"},
+        io_in=("text",),
+        io_out="text",
+        notes="n",
+        source="far.json",
+        host="gpu",
+        run={"": "x > {out}"},
+    )
+    catalog = Catalog(
+        providers={"far": provider},
+        hosts={"gpu": host, "local": Host(id="local", kind="local")},
+        capabilities={"text": Capability(name="text", in_types=("text",), out="text")},
+        types={"text": ("txt",)},
+        bridges={},
+        recipes={},
+    )
+    registry = Registry(
+        hostname="h",
+        generated_at="2026-08-13T00:00:00+00:00",
+        entries={"far": Entry("far", "gpu", "ok", "", None, "2026-08-13")},
+    )
+    assert [f for f in check(catalog, registry, runs=[]) if f.subject == "gpu"] == []
+
+
+def _one_provider_catalog(host: Host) -> Catalog:
+    provider = Provider(
+        id="far",
+        capability="text",
+        kind="tool",
+        detect={"bin": "x"},
+        io_in=("text",),
+        io_out="text",
+        notes="n",
+        source="far.json",
+        host=host.id,
+        run={"": "x > {out}"},
+    )
+    return Catalog(
+        providers={"far": provider},
+        hosts={host.id: host, "local": Host(id="local", kind="local")},
+        capabilities={"text": Capability(name="text", in_types=("text",), out="text")},
+        types={"text": ("txt",)},
+        bridges={},
+        recipes={},
+    )
+
+
+def _registry_with(status: str, reason: str = "") -> Registry:
+    return Registry(
+        hostname="h",
+        generated_at="2026-08-13T00:00:00+00:00",
+        entries={"far": Entry("far", "gpu", status, reason, None, None)},
+    )
+
+
+def test_empty_capability_blames_the_host_when_the_host_is_the_problem(tmp_path, monkeypatch):
+    """«Инструмент установлен?» — неверный вопрос, когда до машины не дошёл ssh."""
+    monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
+    catalog = _one_provider_catalog(
+        Host(id="gpu", kind="ssh", addr="gpu", auto=True, probe="true", env={"PATH": "/bin"})
+    )
+    findings = check(catalog, _registry_with("stale", "хост не ответил"), runs=[])
+    about = [f for f in findings if f.subject == "text"]
+    assert about, findings
+    assert "не ответили" in about[0].message or "did not answer" in about[0].message
+    assert "установлен" not in about[0].message and "installed" not in about[0].message
+
+
+def test_empty_capability_mentions_the_key_when_that_is_the_problem(tmp_path, monkeypatch):
+    monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
+    catalog = _one_provider_catalog(Host(id="gpu", kind="local"))
+    findings = check(catalog, _registry_with("needs-key", "нет ключа"), runs=[])
+    about = [f for f in findings if f.subject == "text"]
+    assert about, findings
+    assert "ключа" in about[0].message or "key" in about[0].message
+
+
+def test_empty_capability_still_asks_about_installation_when_it_is_missing(tmp_path, monkeypatch):
+    monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
+    catalog = _one_provider_catalog(Host(id="gpu", kind="local"))
+    findings = check(catalog, _registry_with("missing", "бинаря нет"), runs=[])
+    about = [f for f in findings if f.subject == "text"]
+    assert about, findings
+    assert "установлен" in about[0].message or "installed" in about[0].message

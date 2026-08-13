@@ -351,3 +351,19 @@ def test_launcher_prefers_a_working_interpreter(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.startswith("nn ")
+
+
+def test_no_machine_specific_path_leaked_into_sources():
+    """Однострочник в шелле однажды подставил $HOME прямо в исходник теста.
+
+    Ищем именно домашний каталог ЭТОЙ машины: выдуманные пути вида /Users/x в
+    фикстурах — нормальные данные, а вот настоящий чужой home в коде означает,
+    что тест или модуль привязался к одной машине.
+    """
+    home = str(Path.home())
+    offenders = []
+    for path in sorted((ROOT / "tests").glob("*.py")) + sorted((ROOT / "src" / "nn").rglob("*.py")):
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if home in line:
+                offenders.append(f"{path.name}:{number} {line.strip()[:60]}")
+    assert offenders == [], offenders

@@ -174,6 +174,8 @@ Drop it in `$NN_HOME/providers/` (default `~/.claude/nn/data/providers/`) and ru
 
 Detection strategies: `bin` · `files` · `glob` · `env` · `http` · `python` · `npm` · `docker` · `brew`.
 
+**Detection happens where the tool will run.** For a provider on an `ssh` host with `auto: true`, all of it is checked on that machine over one ssh connection — `~` is its home, `env` is the host's env, and a binary sitting in your own `PATH` does not make a remote provider available. If the host doesn't answer, the status is `stale` with the ssh error, never "binary not found": nothing was learned about the tool.
+
 Template variables: `{in}` `{out}` `{out_base}` `{tmp}` `{dir}` `{prompt_file}` `{extra0}` `{host.paths.key}` plus everything from `vars`. An unknown variable is a validation error, never a silent empty string.
 
 Ready-made patterns live in [`examples/`](examples/): a script needing its own interpreter, a tool on another machine, an ssh host with a secret by reference.
@@ -312,7 +314,7 @@ disappeared:
 
 ```bash
 make help         # every target
-make check        # ruff + ruff format + mypy --strict + 382 unit tests, no network, ~10s
+make check        # ruff + ruff format + mypy --strict + 412 unit tests, no network, ~10s
 make smoke-fast   # live offline runs: scan, transcript, bridge, doctor (~30s)
 make smoke        # plus TTS with a cold model start (up to 15 min)
 make hooks        # git pre-commit hook: the same checks before anything enters history
