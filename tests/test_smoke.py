@@ -252,3 +252,24 @@ def test_recipe_with_two_inputs_really_runs(tmp_path):
     )
     kinds = [line.strip() for line in probe.stdout.splitlines() if line.strip()]
     assert "video" in kinds and "audio" in kinds, probe.stdout
+
+
+def test_transcribe_a_file_whose_name_fights_the_shell(tmp_path):
+    """Имя с пробелом, скобками, кавычкой и кириллицей — обычное дело у людей."""
+    source = tmp_path / "моя запись (v2) it's.wav"
+    make_tone(source, seconds=2)
+
+    env = {"NN_LANG": "en"}
+    done = subprocess.run(
+        [str(REPO / "bin" / "nn"), "run", "transcribe", str(source)],
+        capture_output=True,
+        text=True,
+        timeout=1800,
+        check=False,
+        cwd=REPO,
+        env={**os.environ, **env},
+    )
+    assert done.returncode == 0, done.stdout + done.stderr
+    envelope = json.loads(done.stdout)
+    assert envelope["outcome"] == "success", envelope
+    assert Path(envelope["out"]).is_file()

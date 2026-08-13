@@ -13,6 +13,7 @@ from nn.transport.ssh import (
     SshTransport,
     build_script,
     is_safe_remote_dir,
+    remote_command,
     remote_dir_for,
 )
 
@@ -32,7 +33,7 @@ class Recorder(SshTransport):
     def _run(self, argv, *, timeout_s, stdin=None):
         argv = list(argv)
         self.calls.append((argv, stdin))
-        if "ls" in argv:
+        if any(part.startswith("ls -1") for part in argv):
             return Executed(0, self.listing, "", False, " ".join(argv))
         return Executed(0, "", "", False, " ".join(argv))
 
@@ -81,7 +82,7 @@ def test_cleanup_is_skipped_when_the_guard_says_no():
     transport.remote_dir = "/tmp"
     transport.run_id = "17"
     transport.finish()
-    assert not any("rm" in argv for argv, _ in transport.calls)
+    assert not any(any("rm -rf" in part for part in argv) for argv, _ in transport.calls)
 
 
 def test_cleanup_runs_for_our_own_directory():
@@ -90,9 +91,9 @@ def test_cleanup_runs_for_our_own_directory():
     transport.remote_dir = "/tmp/nn-17"
     transport.run_id = "17"
     transport.finish()
-    removals = [argv for argv, _ in transport.calls if "rm" in argv]
-    assert removals
-    assert removals[0][-1] == "/tmp/nn-17"
+    removals = [argv for argv, _ in transport.calls if any("rm -rf" in part for part in argv)]
+    assert removals, transport.calls
+    assert removals[0][-1] == "rm -rf -- /tmp/nn-17"
 
 
 def test_prepare_moves_only_local_file_paths(tmp_path):
@@ -225,9 +226,9 @@ def test_collect_brings_back_the_output_and_its_siblings(tmp_path):
     transport.produced = {"result.srt": "subs", "result.txt": "plain"}
     assert transport.collect() is None
     pulled = [argv[-1] for argv, _, _ in transport.transfers]
-    assert "/tmp/nn-17/result.srt" in pulled
-    assert "/tmp/nn-17/result.txt" in pulled
-    assert "/tmp/nn-17/talk.wav" not in pulled
+    assert "cat -- /tmp/nn-17/result.srt" in pulled
+    assert "cat -- /tmp/nn-17/result.txt" in pulled
+    assert not any("talk.wav" in command for command in pulled)
     assert local_out.read_text(encoding="utf-8") == "subs"
     assert (local_out.parent / "result.txt").read_text(encoding="utf-8") == "plain"
 
@@ -250,6 +251,11 @@ def test_collect_reports_a_broken_transfer(tmp_path):
                 argv, timeout_s=timeout_s, stdin_file=stdin_file, stdout_file=stdout_file
             )
             return Executed(1, "", "ssh: connection closed by remote host", False, "ssh")
+
+        def _run(self, argv, *, timeout_s, stdin=None):
+            argv = list(argv)
+            self.calls.append((argv, stdin))
+            return Executed(0, self.listing, "", False, " ".join(argv))
 
     transport = Broken()
     transport.addr = "box"
@@ -532,4 +538,48 @@ def test_failed_preparation_still_cleans_up_the_remote_directory(tmp_path, monke
     assert main(["run", "text", "--prompt", "hi", "--provider", "remote-text"]) == int(
         Exit.PROVIDER_FAILED
     )
-    assert any("rm" in argv for argv in seen), "уборка обязана произойти и после провала"
+    assert any(any("rm -rf" in part for part in argv) for argv in seen), (
+        "уборка обязана произойти и после провала"
+    )
+
+
+def test_ssh_argv_never_relies_on_argument_boundaries():
+    """ssh склеивает argv пробелами — значит команда обязана быть одной строкой.
+
+    Пойман живым прогоном:  уходил четырьмя аргументами,
+    удалённый zsh склеивал их и падал на globbing.
+    """
+    assert remote_command("rm", "-rf", "--", "/tmp/my dir/nn-17") == (
+        "rm -rf -- '/tmp/my dir/nn-17'"
+    )
+    assert remote_command("cat", "--", "/t/a (2).txt") == "cat -- '/t/a (2).txt'"
+
+
+def test_cleanup_of_a_path_with_spaces_cannot_hit_a_neighbour():
+    """Самый опасный случай: незакавыченный путь превращал уборку в снос лишнего."""
+    transport = Recorder()
+    transport.addr = "box"
+    transport.remote_dir = "/tmp/my dir/nn-17"
+    transport.run_id = "17"
+    transport.finish()
+    removals = [argv for argv, _ in transport.calls if any("rm" in part for part in argv)]
+    assert removals, transport.calls
+    command = removals[0][-1]
+    assert command == "rm -rf -- '/tmp/my dir/nn-17'"
+    assert "/tmp/my" not in command.replace("'/tmp/my dir/nn-17'", "")
+
+
+def test_every_remote_call_sends_exactly_one_command_string():
+    """Последний аргумент ssh — вся команда целиком, а не её первое слово."""
+    transport = Recorder()
+    transport.listing = "a.txt\n"
+    transport.prepare({"out": "/local/o.txt"}, host=HOST, run_id="17", env={})
+    transport.downloads = [("/tmp/nn-17/o.txt", "/local/o.txt")]
+    transport.collect()
+    transport.finish()
+
+    for argv, _ in transport.calls:
+        if argv[0] != "ssh":
+            continue
+        tail = argv[argv.index("box") + 1 :]
+        assert len(tail) == 1, tail

@@ -21,6 +21,7 @@ import pytest
 from nn.cli import main
 from nn.errors import Exit
 from nn.model import Host
+from nn.render import render
 from nn.transport.ssh import SshTransport
 
 HOST_ADDR = os.environ.get("NN_SSH_SMOKE_HOST", "")
@@ -392,3 +393,25 @@ def test_home_is_the_remote_home_not_ours():
         assert absent.status == "missing", absent
     finally:
         remote(f'rm -f "$HOME/{marker}"')
+
+
+def test_a_name_with_spaces_survives_the_trip_there_and_back(tmp_path):
+    """Пробелы и кавычка в имени не должны рассыпаться ни при заливке, ни в команде."""
+    source = tmp_path / "моя запись (v2) it's.txt"
+    source.write_text("one\ntwo\nthree\n", encoding="utf-8")
+    out = tmp_path / "итог (копия).txt"
+
+    ssh = transport()
+    prepared = ssh.prepare(
+        {"in": str(source), "out": str(out)}, host=host(), run_id="smoke-spaces", env={}
+    )
+    assert prepared.failure is None, prepared.failure
+
+    command = render("wc -l < {in} > {out}", prepared.context)
+    result = ssh.execute(command, host=host(), timeout_s=60, work_dir=str(tmp_path), env={})
+    assert result.exit_code == 0, result.stderr
+
+    assert ssh.collect() is None
+    assert out.is_file(), "выход с пробелами в имени обязан вернуться"
+    assert out.read_text(encoding="utf-8").strip() == "3"
+    ssh.finish()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import platform
 import re
+import shlex
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from nn.model import Host, Provider
 from nn.paths import expand
 
 _NAME_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_.]*)\}")
+
+PATH_NAMES = frozenset({"in", "out", "out_base", "tmp", "dir", "prompt_file"})
 
 
 def os_key(system: str | None = None) -> str:
@@ -57,7 +60,25 @@ def build_context(
     return context
 
 
+def needs_quoting(name: str) -> bool:
+    """Пути, которые подставляет сам nn, а не автор манифеста.
+
+    Их значения приходят от пользователя (имя файла может быть каким угодно) и
+    обязаны попасть в команду одним аргументом. Всё остальное — `vars` и
+    `host.paths.*` — пишет автор манифеста: там может лежать набор флагов, и
+    кавычить его нельзя.
+    """
+    return name in PATH_NAMES or name.startswith("extra")
+
+
 def render(template: str, context: Mapping[str, str]) -> str:
+    """Подстановка в шаблон команды с экранированием путей.
+
+    Без экранирования `nn run transcribe "my clip.wav"` разваливался на два
+    аргумента и падал с кодом 254: команда собирается строкой для шелла, а имена
+    файлов у людей с пробелами, скобками и кавычками — обычное дело.
+    """
+
     def sub(match: re.Match[str]) -> str:
         name = match.group(1)
         if name not in context:
@@ -68,6 +89,9 @@ def render(template: str, context: Mapping[str, str]) -> str:
                     f"шаблон ссылается на неизвестную переменную {{{name}}}",
                 ),
             )
-        return context[name]
+        value = context[name]
+        if not needs_quoting(name) or not value:
+            return value
+        return shlex.quote(value)
 
     return _NAME_RE.sub(sub, template)

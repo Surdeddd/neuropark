@@ -54,6 +54,17 @@ def _text(raw: str | bytes | None) -> str:
     return raw
 
 
+def remote_command(*parts: str) -> str:
+    """Одна строка для удалённого шелла вместо argv.
+
+    ssh не сохраняет границы аргументов: он склеивает их пробелами и отдаёт
+    логин-шеллу той стороны. Поэтому `["rm", "-rf", "--", "/tmp/my dir/nn-17"]`
+    превращался в снос сразу `/tmp/my` и `dir/nn-17`, а `cat -- 'файл (2).txt'`
+    падал на globbing в zsh. Кавычим здесь — ровно один раз и для всех вызовов.
+    """
+    return " ".join(shlex.quote(part) for part in parts)
+
+
 def build_script(command: str, *, remote_dir: str, env: Mapping[str, str]) -> str:
     """Скрипт для `sh -s`: окружение и команда уходят на stdin.
 
@@ -199,12 +210,12 @@ class SshTransport:
 
     def _upload(self, local: Path, remote_path: str) -> Executed:
         argv = [self.ssh_bin, *self._options(), str(self.addr)]
-        argv += ["sh", "-c", f"cat > {shlex.quote(remote_path)}"]
+        argv += [f"cat > {shlex.quote(remote_path)}"]
         return self._stream(argv, timeout_s=TRANSFER_TIMEOUT_S, stdin_file=local)
 
     def _download(self, remote_path: str, local: Path) -> Executed:
         argv = [self.ssh_bin, *self._options(), str(self.addr)]
-        argv += ["cat", "--", remote_path]
+        argv += [remote_command("cat", "--", remote_path)]
         return self._stream(argv, timeout_s=TRANSFER_TIMEOUT_S, stdout_file=local)
 
     def prepare(
@@ -215,7 +226,12 @@ class SshTransport:
         self.remote_dir = self.remote_dir or remote_dir_for(host, run_id)
 
         made = self._run(
-            [self.ssh_bin, *self._options(), self.addr, "mkdir", "-p", "--", self.remote_dir],
+            [
+                self.ssh_bin,
+                *self._options(),
+                self.addr,
+                remote_command("mkdir", "-p", "--", self.remote_dir),
+            ],
             timeout_s=CONTROL_TIMEOUT_S,
         )
         if made.exit_code != 0 or made.timed_out:
@@ -283,7 +299,7 @@ class SshTransport:
 
     def _remote_names(self) -> list[str]:
         argv = [self.ssh_bin, *self._options(), str(self.addr)]
-        argv += ["ls", "-1", "--", str(self.remote_dir)]
+        argv += [remote_command("ls", "-1", "--", str(self.remote_dir))]
         listing = self._run(argv, timeout_s=CONTROL_TIMEOUT_S)
         return [name for name in listing.stdout.splitlines() if name.strip()]
 
@@ -313,7 +329,12 @@ class SshTransport:
         if self.remote_dir is None or not is_safe_remote_dir(self.remote_dir, self.run_id):
             return
         self._run(
-            [self.ssh_bin, *self._options(), str(self.addr), "rm", "-rf", "--", self.remote_dir],
+            [
+                self.ssh_bin,
+                *self._options(),
+                str(self.addr),
+                remote_command("rm", "-rf", "--", self.remote_dir),
+            ],
             timeout_s=CONTROL_TIMEOUT_S,
         )
 

@@ -11,6 +11,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · versioning: 
 
 ### Fixed
 
+- **A file name with a space broke the run.** Commands are assembled as shell strings, so
+  `nn run transcribe "my clip.wav"` split into two arguments and died with exit 254 —
+  and a name with a quote in it could have run whatever came after. Every path nn
+  substitutes itself (`{in}` `{out}` `{out_base}` `{tmp}` `{dir}` `{prompt_file}`
+  `{extraN}`) is now shell-escaped; `vars` and `host.paths.*` stay raw, because those
+  are the manifest author's and may legitimately hold a set of flags.
+- **ssh does not preserve argument boundaries** — it joins argv with spaces and hands the
+  result to the remote login shell. So a remote path with a space was re-split over there:
+  `cat -- '/tmp/…/итог (копия).txt'` failed on globbing, and worse, cleanup of
+  `/tmp/my dir/nn-17` would have removed `/tmp/my` **and** `dir/nn-17`. Every remote call
+  now sends one fully quoted command string.
+
 - **A provider on a remote host was detected on the wrong machine.** Detection always ran
   locally, so `nn ls` answered about *this* computer: a binary in your own `PATH` made a
   provider on `gpu-box` look available, and its absence here marked a perfectly installed
