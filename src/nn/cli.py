@@ -162,10 +162,29 @@ def _auto_learn() -> None:
             print(f"{label}: {', '.join(touched)}", file=sys.stderr)
 
 
-def _require_files(paths: tuple[str, ...], *, what: str) -> None:
-    for raw in paths:
-        if not Path(raw).expanduser().is_file():
-            raise NnError(Exit.BAD_IO, bi(f"{what} {raw} not found", f"{what} {raw} не найден"))
+def _usable_file(raw: str, *, what: str) -> Path:
+    """Вход, пригодный для запуска: существует, это файл, и он не пустой.
+
+    Причина называется точно. «Не найден» про существующую директорию — вранье,
+    а нулевой файл раньше уезжал в инструмент и возвращался кодом 183: правда про
+    вход подменялась падением модели.
+    """
+    path = Path(raw).expanduser()
+    if path.is_dir():
+        raise NnError(
+            Exit.BAD_IO, bi(f"{what} {raw} is a directory", f"{what} {raw} — это директория")
+        )
+    if not path.is_file():
+        raise NnError(Exit.BAD_IO, bi(f"{what} {raw} not found", f"{what} {raw} не найден"))
+    if path.stat().st_size == 0:
+        raise NnError(Exit.BAD_IO, bi(f"{what} {raw} is empty", f"{what} {raw} пустой"))
+    # Абсолютный путь: рабочая директория провайдера может отличаться от текущей,
+    # и в конверте с журналом относительный путь потом уже не расшифровать.
+    return path.resolve()
+
+
+def _require_files(paths: tuple[str, ...], *, what: str) -> tuple[str, ...]:
+    return tuple(str(_usable_file(raw, what=what)) for raw in paths)
 
 
 def _load_registry() -> Registry:
@@ -299,15 +318,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
     catalog = load_catalog()
     registry = _load_registry()
     in_type: str | None = None
+    source: Path | None = None
     if args.input:
-        source = Path(args.input)
-        if not source.is_file():
-            raise NnError(
-                Exit.BAD_IO,
-                bi(f"input file {source} not found", f"входной файл {source} не найден"),
-            )
+        source = _usable_file(args.input, what=bi("input file", "входной файл"))
         in_type = type_of(str(source), catalog.types)
-    _require_files(tuple(args.extra), what=bi("extra input", "дополнительный вход"))
+    extra = _require_files(tuple(args.extra), what=bi("extra input", "дополнительный вход"))
     cap = catalog.capabilities.get(args.capability)
     if cap is not None:
         check_extra(cap, tuple(args.extra), catalog.types)
@@ -324,9 +339,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
     envelope = execute(
         choice,
         catalog=catalog,
-        in_path=args.input,
+        in_path=str(source) if source else None,
         out_path=args.out,
-        extra=tuple(args.extra),
+        extra=extra,
         prompt=args.prompt,
         retries=args.retries,
         with_dossier=not args.no_dossier,

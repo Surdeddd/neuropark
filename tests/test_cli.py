@@ -247,3 +247,45 @@ def test_out_into_a_missing_directory_is_created(env, capsys):
     envelope = json.loads(capsys.readouterr().out)
     assert envelope["outcome"] == "success", envelope
     assert target.is_file()
+
+
+def test_a_directory_as_input_says_it_is_a_directory(env, capsys):
+    """«Не найден» про существующую директорию — вранье о причине."""
+    main(["scan"])
+    weird = env / "clip.wav"
+    weird.mkdir()
+    capsys.readouterr()
+    assert main(["run", "transcribe", str(weird)]) == int(Exit.BAD_IO)
+    assert "директория" in capsys.readouterr().err
+
+
+def test_an_empty_input_is_refused_before_the_tool_sees_it(env, capsys):
+    """Нулевой файл уезжал в инструмент и возвращался его кодом падения."""
+    main(["scan"])
+    empty = env / "zero.wav"
+    empty.write_bytes(b"")
+    capsys.readouterr()
+    assert main(["run", "transcribe", str(empty)]) == int(Exit.BAD_IO)
+    assert "пуст" in capsys.readouterr().err
+
+
+def test_a_relative_input_is_recorded_absolute(env, capsys, monkeypatch):
+    """Рабочая директория провайдера может отличаться от текущей."""
+    main(["scan"])
+    source = env / "rel.wav"
+    source.write_bytes(b"\x00" * 16)
+    monkeypatch.chdir(env)
+    capsys.readouterr()
+    assert main(["run", "transcribe", "rel.wav"]) == int(Exit.OK)
+    envelope = json.loads(capsys.readouterr().out)
+    assert envelope["in"] == str(source.resolve())
+
+
+def test_a_missing_extra_input_names_itself(env, capsys):
+    main(["scan"])
+    source = env / "a.wav"
+    source.write_bytes(b"\x00" * 16)
+    capsys.readouterr()
+    code = main(["run", "transcribe", str(source), "--extra", str(env / "nope.srt")])
+    assert code == int(Exit.BAD_IO)
+    assert "nope.srt" in capsys.readouterr().err

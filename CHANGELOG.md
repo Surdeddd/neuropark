@@ -11,6 +11,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · versioning: 
 
 ### Fixed
 
+- **The input check named the wrong cause.** A directory passed as input was reported as
+  «not found», and a zero-byte file went to the tool and came back as its crash code (183
+  from whisper) — a verdict about the model for a problem with the input. Each case says
+  what it is now, and a relative input path is recorded absolute, because the provider's
+  working directory is not always the current one.
 - **Two runs in the same second shared one identity.** `run_id` was second-plus-provider,
   so two `nn run` of the same provider started within one second got the same output file,
   the same log and the same temp prefix, and clobbered each other — confirmed by two
