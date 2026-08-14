@@ -223,6 +223,8 @@ nn recipe run bilingual-subs clip.mp4
 
 `{input}` is the recipe's original input, `{stepK.out}` the output of step K. Forward references are rejected at validation time.
 
+A step can also name a **role** instead of a capability — `{ "role": "cleaner" }` — and the provider comes from that role's chain in `roles.json`. The chain decides the order, so it wins over `rank`: put the model you actually want first, and the step falls through to the next one when it is unavailable or its quota window is spent.
+
 ## Orchestration
 
 For work that deserves more than one model:
@@ -314,7 +316,7 @@ disappeared:
 
 ```bash
 make help         # every target
-make check        # ruff + ruff format + mypy --strict + 439 unit tests, no network, ~10s
+make check        # ruff + ruff format + mypy --strict + 444 unit tests, no network, ~10s
 make smoke-fast   # live offline runs: scan, transcript, bridge, doctor (~30s)
 make smoke        # plus TTS with a cold model start (up to 15 min)
 make hooks        # git pre-commit hook: the same checks before anything enters history
@@ -328,7 +330,7 @@ Rules that hold: stdlib only at runtime · no `type: ignore` anywhere in `src` �
 
 Adding a tool needs no code from you — see [CONTRIBUTING.md](CONTRIBUTING.md). Release notes: [CHANGELOG.md](CHANGELOG.md).
 
-Not implemented, and saying so instead of failing silently: the `http` transport (such hosts print the command), `adapter` providers for tools that need a queue, and steps that name a `role` instead of a capability inside a recipe. Recipes with **several inputs do work** — a step can take `{input}` and an earlier step's output at once, and a live test runs exactly that through ffmpeg.
+Not implemented, and saying so instead of failing silently: `adapter` providers for tools that need a queue and polling — ComfyUI is the case — and with them the `http` host kind, which today refuses out loud and tells you to set `auto: false`. A host reached over HTTP cannot run a shell command, so there is no generic "http transport" to build: what is missing is the adapter, and it will be written against a real ComfyUI rather than a stub.
 
 ## License
 

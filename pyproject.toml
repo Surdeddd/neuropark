@@ -1,6 +1,6 @@
 [project]
 name = "neuropark"
-version = "0.9.0"
+version = "0.10.0"
 description = "nn — каталог парка нейронок и единый контракт вызова"
 requires-python = ">=3.11"
 dependencies = []

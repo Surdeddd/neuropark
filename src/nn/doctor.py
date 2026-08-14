@@ -303,6 +303,21 @@ def check(
                         ),
                     )
                 )
+            # Роль в шаге ищется в roles.json, который пишет nn adapt, а правят руками:
+            # ссылка на несуществующую роль обязана всплыть здесь, а не на прогоне.
+            if step.role and step.role not in catalog.roles.roles:
+                findings.append(
+                    Finding(
+                        "error",
+                        recipe.id,
+                        bi(
+                            f"step {index}: role {step.role} is absent from roles.json"
+                            " — run nn adapt or fix the recipe",
+                            f"шаг {index}: роль {step.role} не описана в roles.json"
+                            " — сделай nn adapt или поправь рецепт",
+                        ),
+                    )
+                )
             for ref in (step.in_ref, *step.extra_in):
                 if ref is None:
                     continue

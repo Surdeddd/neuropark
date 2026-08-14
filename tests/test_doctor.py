@@ -2,7 +2,7 @@ from pathlib import Path
 
 from nn.catalog import Catalog, load_catalog
 from nn.doctor import check
-from nn.model import Bridge, Capability, Host, Provider
+from nn.model import Bridge, Capability, Host, Provider, Recipe, Step
 from nn.registry import Entry, Registry
 from nn.runlog import RunRecord
 
@@ -327,3 +327,39 @@ def test_empty_capability_still_asks_about_installation_when_it_is_missing(tmp_p
     about = [f for f in findings if f.subject == "text"]
     assert about, findings
     assert "установлен" in about[0].message or "installed" in about[0].message
+
+
+def test_recipe_step_with_an_unknown_role_is_an_error(tmp_path, monkeypatch):
+    """roles.json правят руками — опечатку в роли лучше поймать доктором."""
+    monkeypatch.setenv("NN_STATE", str(tmp_path / "state"))
+    provider = Provider(
+        id="t",
+        capability="text",
+        kind="tool",
+        detect={"bin": "x"},
+        io_in=("text",),
+        io_out="text",
+        notes="n",
+        source="t.json",
+        host="local",
+        run={"": "x > {out}"},
+    )
+    recipe = Recipe(id="chain", description="", steps=(Step(role="nosuch"),))
+    catalog = Catalog(
+        providers={"t": provider},
+        hosts={"local": Host(id="local", kind="local")},
+        capabilities={"text": Capability(name="text", in_types=("text",), out="text")},
+        types={"text": ("txt",)},
+        bridges={},
+        recipes={"chain": recipe},
+    )
+    registry = Registry(
+        hostname="h",
+        generated_at="2026-08-14T00:00:00+00:00",
+        entries={"t": Entry("t", "local", "ok", "", None, "2026-08-14")},
+    )
+    findings = check(catalog, registry, runs=[])
+    about = [f for f in findings if f.subject == "chain"]
+    assert about, findings
+    assert about[0].severity == "error"
+    assert "nosuch" in about[0].message

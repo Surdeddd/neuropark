@@ -7,6 +7,26 @@ speaks both English and Russian.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · versioning: [SemVer](https://semver.org/).
 
+## 0.10.0 — 2026-08-14
+
+### Added
+
+- **A recipe step can name a `role`.** The provider comes from that role's chain in
+  `roles.json`, so the chain — not `rank` — decides the order, and the step falls through
+  to the next provider when one is unavailable or its quota window is spent. This was the
+  last documented gap in recipes. A live test proves the fall-through on real ffmpeg: the
+  role names an uninstalled provider first, and the run lands on the second one despite it
+  having the lower rank.
+- `nn doctor` catches a recipe step pointing at a role that `roles.json` does not describe,
+  before the run instead of during it.
+
+### Changed
+
+- The honest-gaps note names what is actually left: `adapter` providers for tools with a
+  queue (ComfyUI), and with them the `http` host kind. A host reached over HTTP cannot run
+  a shell command, so there is no generic "http transport" to write — the missing piece is
+  the adapter, and it will be built against a real ComfyUI rather than a stub.
+
 ## 0.9.0 — 2026-08-13
 
 ### Fixed

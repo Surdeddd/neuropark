@@ -273,3 +273,97 @@ def test_transcribe_a_file_whose_name_fights_the_shell(tmp_path):
     envelope = json.loads(done.stdout)
     assert envelope["outcome"] == "success", envelope
     assert Path(envelope["out"]).is_file()
+
+
+def test_recipe_step_that_names_a_role_really_runs(tmp_path):
+    """Шаг рецепта берёт провайдера из роли — живьём, на настоящем ffmpeg."""
+    data = tmp_path / "data"
+    (data / "providers").mkdir(parents=True)
+    (data / "hosts").mkdir(parents=True)
+    (data / "recipes").mkdir(parents=True)
+    (data / "hosts" / "local.json").write_text(
+        json.dumps({"id": "local", "kind": "local"}), encoding="utf-8"
+    )
+    (data / "capabilities.json").write_text(
+        (REPO / "capabilities.json").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    (data / "providers" / "loud.json").write_text(
+        json.dumps(
+            {
+                "id": "loud",
+                "capability": "audio-clean",
+                "kind": "tool",
+                "rank": 5,
+                "detect": {"bin": "ffmpeg"},
+                "io": {"in": ["audio"], "out": "audio"},
+                "run": "ffmpeg -nostdin -y -i {in} -af volume=2.0 {out}",
+                "notes": {"en": "twice as loud", "ru": "вдвое громче"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (data / "providers" / "quiet.json").write_text(
+        json.dumps(
+            {
+                "id": "quiet",
+                "capability": "audio-clean",
+                "kind": "tool",
+                "rank": 90,
+                "detect": {"bin": "definitely-not-installed-xyz"},
+                "io": {"in": ["audio"], "out": "audio"},
+                "run": "ffmpeg -nostdin -y -i {in} -af volume=0.5 {out}",
+                "notes": {"en": "half as loud, not installed", "ru": "вдвое тише, не установлен"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    # Роль называет сначала недоступного провайдера: цепочка обязана дойти до второго,
+    # причём вопреки rank — роль решает порядок сама.
+    (data / "roles.json").write_text(
+        json.dumps(
+            {
+                "roles": {"cleaner": {"providers": ["quiet", "loud"], "worktree": False}},
+                "patterns": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (data / "recipes" / "byrole.json").write_text(
+        json.dumps(
+            {
+                "id": "byrole",
+                "description": {"en": "clean by role", "ru": "чистка по роли"},
+                "steps": [{"role": "cleaner"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    source = tmp_path / "tone.wav"
+    make_tone(source, seconds=2)
+
+    env = {"NN_DATA": str(data), "NN_STATE": str(tmp_path / "state"), "NN_LANG": "en"}
+    scan = subprocess.run(
+        [str(REPO / "bin" / "nn"), "scan"],
+        capture_output=True,
+        text=True,
+        timeout=600,
+        check=False,
+        env={**os.environ, **env},
+    )
+    assert scan.returncode == 0, scan.stderr
+
+    done = subprocess.run(
+        [str(REPO / "bin" / "nn"), "recipe", "run", "byrole", str(source)],
+        capture_output=True,
+        text=True,
+        timeout=1800,
+        check=False,
+        env={**os.environ, **env},
+    )
+    assert done.returncode == 0, done.stdout + done.stderr
+    envelopes = json.loads(done.stdout)
+    assert len(envelopes) == 1, envelopes
+    assert envelopes[0]["provider"] == "loud", "цепочка роли обязана обойти недоступного"
+    assert envelopes[0]["outcome"] == "success"
+    assert Path(envelopes[0]["out"]).stat().st_size > 1000
