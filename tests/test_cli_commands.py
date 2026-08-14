@@ -56,9 +56,26 @@ def park(monkeypatch, tmp_path):
     )
     (data / "capabilities.json").write_text(json.dumps(CAPS), encoding="utf-8")
     # NN_DATA подменяет поставляемый каталог целиком, а priors.json — часть поставки:
-    # без него `nn init` честно отказывается кодом 7, и проверять было бы нечего.
+    # без него `nn init` честно отказывается кодом 7. Прайор здесь свой и опирается
+    # на `sh`, который есть на любой POSIX-машине: с репозиторными прайорами тест
+    # зависел бы от того, что установлено у прогоняющего, и падал на чистом раннере.
     (data / "priors.json").write_text(
-        (REPO / "priors.json").read_text(encoding="utf-8"), encoding="utf-8"
+        json.dumps(
+            {
+                "priors": [
+                    {
+                        "id": "shell-echo",
+                        "capability": "text",
+                        "kind": "tool",
+                        "probe": {"bin": "sh"},
+                        "io": {"in": ["text"], "out": "text"},
+                        "run": "cat {prompt_file} > {out}",
+                        "notes": {"en": "always present", "ru": "есть всегда"},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
     )
     (data / "dossier-rules.json").write_text(
         (REPO / "dossier-rules.json").read_text(encoding="utf-8"), encoding="utf-8"
@@ -73,7 +90,7 @@ def park(monkeypatch, tmp_path):
 def test_init_dry_run_writes_nothing(park, capsys):
     assert main(["init", "--dry-run"]) == int(Exit.OK)
     out = capsys.readouterr().out
-    assert "capability" in out
+    assert "shell-echo" in out
     written = list((park / "home").rglob("*.json")) if (park / "home").exists() else []
     assert written == [], written
 
@@ -82,7 +99,7 @@ def test_init_writes_manifests_that_the_catalog_can_read(park, capsys):
     assert main(["init"]) == int(Exit.OK)
     assert "written manifests" in capsys.readouterr().out
     manifests = sorted((park / "home" / "providers").glob("*.json"))
-    assert manifests, "хоть один инструмент на машине найтись обязан"
+    assert [path.stem for path in manifests] == ["shell-echo"]
     for path in manifests:
         payload = json.loads(path.read_text(encoding="utf-8"))
         assert payload["id"] == path.stem
