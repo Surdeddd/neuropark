@@ -198,3 +198,41 @@ def test_load_rules_reads_repo_file():
     rules = load_rules(Path(__file__).resolve().parents[1])
     assert rules
     assert any("no module named" in needle for needle, _ in rules)
+
+
+def test_personal_rules_extend_and_override_the_bundled_ones(tmp_path, monkeypatch):
+    """Правила досье пополняются руками, значит их надо где-то держать своими.
+
+    Провайдеры, хосты и рецепты слоятся давно, а правила — нет: личного файла
+    просто некуда было положить.
+    """
+    import json
+
+    from nn.dossier import load_rules
+
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "dossier-rules.json").write_text(
+        json.dumps(
+            {
+                "rules": [
+                    {
+                        "match": "no such file or directory",
+                        "instruction": {"en": "my own advice", "ru": "мой личный совет"},
+                    },
+                    {
+                        "match": "disk quota exceeded",
+                        "instruction": {"en": "free up space", "ru": "освободи место"},
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("NN_HOME", str(home))
+    monkeypatch.setenv("NN_LANG", "en")
+
+    rules = dict(load_rules())
+    assert rules["no such file or directory"] == "my own advice", "личное перекрывает поставку"
+    assert rules["disk quota exceeded"] == "free up space", "личное дополняет поставку"
+    assert "connection refused" in rules, "поставляемые правила никуда не делись"

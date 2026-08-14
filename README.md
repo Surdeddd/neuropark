@@ -262,6 +262,8 @@ A dossier is what the catalog learned the hard way, assembled with no LLM involv
 
 That instruction is injected into the provider's prompt from then on. Turn it off per call with `--no-dossier`.
 
+The advice comes from `dossier-rules.json` — signature → instruction, filled by hand as gotchas pile up. Drop your own copy in `$NN_HOME` and it extends the bundled set, overriding it where the signatures match.
+
 ## Two rules the engine never breaks
 
 > **No silent model substitution.** If the best provider's window is exhausted, `nn` fails with exit code 6, names the live alternative and waits for `--fallback`. Substitution happens only when you asked for it.
@@ -316,7 +318,7 @@ disappeared:
 
 ```bash
 make help         # every target
-make check        # ruff + ruff format + mypy --strict + 444 unit tests, no network, ~10s
+make check        # ruff + ruff format + mypy --strict + 456 unit tests, no network, ~10s
 make smoke-fast   # live offline runs: scan, transcript, bridge, doctor (~30s)
 make smoke        # plus TTS with a cold model start (up to 15 min)
 make hooks        # git pre-commit hook: the same checks before anything enters history

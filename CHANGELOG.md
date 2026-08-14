@@ -7,6 +7,27 @@ speaks both English and Russian.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · versioning: [SemVer](https://semver.org/).
 
+## 0.11.0 — 2026-08-14
+
+### Fixed
+
+- **`nn orchestrate` ignored `--json`** and printed prose no matter what. Every other
+  command honours the flag, and this is the tool an agent drives — it now returns the
+  report path and a stage list with provider, outcome, output and patch.
+- **`nn adapt --json` named its keys wrong**: `roles` held the *path* to the file while the
+  roles themselves hid under `config`, so a script reading `payload["roles"]` got a string.
+  The payload is `{"path": …, "roles": …, "patterns": …}` now.
+
+### Added
+
+- **Personal dossier rules.** `dossier-rules.json` is meant to be filled by hand as gotchas
+  pile up, but there was nowhere to put your own: providers, hosts and recipes layer,
+  the rules did not. A file in `$NN_HOME` now extends the bundled set and overrides it by
+  signature.
+- Unit tests for the commands that only had the sweep behind them — `init`, `adapt`,
+  `learn`, `burn`, `orchestrate` — including the two-vendor rule of cross-review and the
+  report landing on disk. Coverage went from 90% to 93%, and `cli.py` from 72% to 88%.
+
 ## 0.10.0 — 2026-08-14
 
 ### Added

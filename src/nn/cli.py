@@ -35,7 +35,7 @@ from nn.run import execute, exit_code_for
 from nn.runlog import last_success_map, read_all
 from nn.scan import scan
 
-VERSION = "0.10.0"
+VERSION = "0.11.0"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -430,11 +430,11 @@ def _cmd_adapt(as_json: bool) -> int:
     result = build(catalog, registry)
     path = write(result)
     if as_json:
-        print(
-            json.dumps(
-                {"roles": str(path), "config": result.to_payload()}, ensure_ascii=False, indent=2
-            )
-        )
+        # Ключ называет то, что в нём лежит. Раньше `roles` держал путь до файла,
+        # а сами роли прятались в `config` — скрипт, читающий payload["roles"],
+        # получал строку вместо ролей.
+        payload = {"path": str(path), **result.to_payload()}
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
         return int(Exit.OK)
     yes, no = bi("yes", "да"), bi("no", "нет")
     rows = [
@@ -481,6 +481,34 @@ def _cmd_orchestrate(args: argparse.Namespace) -> int:
     run_id = results[0].envelope.run_id if results else "empty"
     path = save_report(results, run_id)
     patches = [item.patch for item in results if item.patch]
+    if args.json:
+        # Единственная команда, которая раньше игнорировала --json и всё равно
+        # печатала прозу. Для инструмента, которым рулит агент, это осечка.
+        print(
+            json.dumps(
+                {
+                    "report": str(path),
+                    "stages": [
+                        {
+                            "stage": item.stage,
+                            "role": item.role,
+                            "provider": item.provider,
+                            "outcome": item.envelope.outcome,
+                            "out": item.envelope.out,
+                            "patch": item.patch,
+                        }
+                        for item in results
+                    ],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return (
+            int(Exit.OK)
+            if all(i.envelope.outcome == "success" for i in results)
+            else int(Exit.PROVIDER_FAILED)
+        )
     print(f"{bi('report', 'отчёт')}: {path}")
     for patch in patches:
         label = bi("patch", "патч")

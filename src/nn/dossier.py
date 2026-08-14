@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from nn.i18n import bi
-from nn.paths import data_dir, state_dir
+from nn.paths import data_dir, state_dir, user_data_dir
 from nn.runlog import RunRecord, read_all
 from nn.schema import bilingual
 
@@ -79,8 +79,7 @@ def signature(stderr_tail: str) -> str:
     return _NUMBERS.sub("N", without_paths).lower()[:120]
 
 
-def load_rules(root: Path | None = None) -> list[tuple[str, str]]:
-    path = (root or data_dir()) / "dossier-rules.json"
+def _rules_from(path: Path) -> list[tuple[str, str]]:
     if not path.is_file():
         return []
     try:
@@ -92,6 +91,20 @@ def load_rules(root: Path | None = None) -> list[tuple[str, str]]:
         for rule in payload.get("rules", [])
         if rule.get("match") and rule.get("instruction")
     ]
+
+
+def load_rules(root: Path | None = None) -> list[tuple[str, str]]:
+    """Правила из поставки плюс личные, и личные идут первыми.
+
+    Файл прямо предполагает пополнение руками, а перекрыть поставляемый набор было
+    негде: провайдеры, хосты и рецепты слоятся, а правила досье — нет. Теперь
+    личный `$NN_HOME/dossier-rules.json` дополняет и перекрывает поставку по
+    одинаковой подписи.
+    """
+    bundled = _rules_from((root or data_dir()) / "dossier-rules.json")
+    personal = [] if root else _rules_from(user_data_dir() / "dossier-rules.json")
+    seen = {match for match, _ in personal}
+    return personal + [rule for rule in bundled if rule[0] not in seen]
 
 
 def distill(records: list[RunRecord], rules: list[tuple[str, str]]) -> list[Lesson]:
